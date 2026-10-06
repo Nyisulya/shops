@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { App as CapApp } from '@capacitor/app';
 import { db } from './db/dexie';
 import { initializeDatabaseData } from './db/initialData';
 import type { BranchType, Sale, LaundryOrder, WakalaTransaction } from './types';
@@ -52,6 +53,10 @@ export const App: React.FC = () => {
   const [isLicenseModalOpen, setIsLicenseModalOpen] = useState<boolean>(false);
   const [licenseInfo, setLicenseInfo] = useState<LicenseInfo>(() => checkLicenseStatus());
 
+  // Double-tap back button to exit app states
+  const [showExitToast, setShowExitToast] = useState(false);
+  const lastBackPressRef = useRef<number>(0);
+
   // Initialize DB data once and re-check license periodically
   useEffect(() => {
     initializeDatabaseData();
@@ -60,6 +65,49 @@ export const App: React.FC = () => {
     }, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Hardware Back Button (Double Tap to Exit) Handler
+  useEffect(() => {
+    let backListener: any = null;
+
+    const setupBackHandler = async () => {
+      backListener = await CapApp.addListener('backButton', () => {
+        // 1. If any modal is open, close it first
+        if (isReceiptOpen) {
+          setIsReceiptOpen(false);
+          return;
+        }
+        if (isSyncModalOpen) {
+          setIsSyncModalOpen(false);
+          return;
+        }
+        if (isLicenseModalOpen) {
+          setIsLicenseModalOpen(false);
+          return;
+        }
+
+        // 2. Double-tap to exit check
+        const now = Date.now();
+        if (now - lastBackPressRef.current < 2000) {
+          // Second tap within 2 seconds -> Exit app!
+          CapApp.exitApp();
+        } else {
+          // First tap -> Don't exit, show toast
+          lastBackPressRef.current = now;
+          setShowExitToast(true);
+          setTimeout(() => setShowExitToast(false), 2000);
+        }
+      });
+    };
+
+    setupBackHandler();
+
+    return () => {
+      if (backListener) {
+        backListener.remove();
+      }
+    };
+  }, [isReceiptOpen, isSyncModalOpen, isLicenseModalOpen]);
 
   const branches = useLiveQuery(async () => db.branches.toArray(), []) || [];
   const laundryOrders = useLiveQuery(async () => db.laundryOrders.toArray(), []) || [];
@@ -213,11 +261,19 @@ export const App: React.FC = () => {
   // If not authenticated, render 4-digit PIN login screen
   if (!isAuthenticated) {
     return (
-      <PinLogin 
-        onLoginSuccess={handleLoginSuccess}
-        targetBranchType={currentBranchType}
-        targetBranchId={currentBranchId}
-      />
+      <>
+        <PinLogin 
+          onLoginSuccess={handleLoginSuccess}
+          targetBranchType={currentBranchType}
+          targetBranchId={currentBranchId}
+        />
+        {showExitToast && (
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-slate-100 px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-md flex items-center gap-2 animate-in fade-in zoom-in duration-150">
+            <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+            <span className="text-xs font-bold">Bonyeza tena kurudi nyuma ili kutoka</span>
+          </div>
+        )}
+      </>
     );
   }
 
@@ -338,6 +394,14 @@ export const App: React.FC = () => {
         onClose={() => setIsLicenseModalOpen(false)}
         onSuccess={() => setLicenseInfo(checkLicenseStatus())}
       />
+
+      {/* Double back-press exit toast notification */}
+      {showExitToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-slate-100 px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-md flex items-center gap-2 animate-in fade-in zoom-in duration-150">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+          <span className="text-xs font-bold">Bonyeza tena kurudi nyuma ili kutoka</span>
+        </div>
+      )}
     </div>
   );
 };
