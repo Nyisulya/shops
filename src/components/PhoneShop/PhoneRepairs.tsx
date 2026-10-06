@@ -17,6 +17,7 @@ import {
 import { db, generateUniqueId, queueSync } from '../../db/dexie';
 import type { RepairOrder, RepairStatus } from '../../types';
 import { formatCurrency, formatDate, generateWhatsAppLink } from '../../services/receiptService';
+import { SHOPS } from '../Auth/PinLogin';
 
 interface PhoneRepairsProps {
   onOpenReceipt: (data: any) => void;
@@ -26,6 +27,8 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const activeBranchId = localStorage.getItem('active_branch_id') || 'branch_phone_1';
+  const activeShop = SHOPS.find(s => s.id === activeBranchId);
 
   // Form states
   const [customerName, setCustomerName] = useState('');
@@ -98,9 +101,9 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
       onOpenReceipt({
         type: 'phone_repair',
         title: 'Kazi ya Matengenezo (Phone Repair Ticket)',
-        branchName: 'Duka la Simu & Vifaa',
+        branchName: activeShop?.name || 'Duka la Simu & Vifaa',
         branchPhone: '+255 712 345 678',
-        branchLocation: 'Mwenge / Mlimani City Branch',
+        branchLocation: activeShop?.sub || 'Mwanza',
         receiptNumber: newRepair.repairNumber,
         createdAt: newRepair.createdAt,
         customerName: newRepair.customerName,
@@ -311,9 +314,9 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
                     onClick={() => onOpenReceipt({
                       type: 'phone_repair',
                       title: 'Kazi ya Matengenezo (Ticket)',
-                      branchName: 'Duka la Simu & Vifaa',
+                      branchName: activeShop?.name || 'Duka la Simu & Vifaa',
                       branchPhone: '+255 712 345 678',
-                      branchLocation: 'Mwenge / Mlimani City Branch',
+                      branchLocation: activeShop?.sub || 'Mwanza',
                       receiptNumber: item.repairNumber,
                       createdAt: item.createdAt,
                       customerName: item.customerName,

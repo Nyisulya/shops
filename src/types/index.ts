@@ -1,4 +1,4 @@
-export type BranchType = 'phone' | 'laundry' | 'wakala' | 'boss';
+export type BranchType = 'phone' | 'laundry' | 'wakala' | 'boss' | 'admin';
 
 export interface Branch {
   id: string;
@@ -93,11 +93,12 @@ export interface RepairOrder {
 // Laundry
 export type LaundryStage = 'received' | 'washing' | 'ironing' | 'ready' | 'delivered';
 export type PaymentStatus = 'paid' | 'partial' | 'pending';
+export type LaundryServiceType = 'wash_iron' | 'wash_only' | 'iron_only' | 'dry_clean';
 
 export interface LaundryItem {
   id: string;
   itemType: string; // Shati, Suruali, Suti, Gauni, Blanket, etc.
-  service: 'wash_iron' | 'wash_only' | 'iron_only' | 'dry_clean';
+  service: LaundryServiceType;
   quantity: number;
   pricePerItem: number;
   totalPrice: number;
@@ -157,24 +158,42 @@ export interface WakalaDayLog {
   branchId: string;
   date: string; // YYYY-MM-DD
   openingCash: number;
-  openingFloatMpesa: number;
-  openingFloatTigo: number;
-  openingFloatAirtel: number;
-  openingFloatHalopesa: number;
-  openingFloatBank: number;
+  
+  // Laini 4 za Wakala Kawaida (Agent Lines - Kumuwekea mteja)
+  openingFloatMpesaAgent?: number;
+  openingFloatTigoAgent?: number;
+  openingFloatAirtelAgent?: number;
+  openingFloatHalopesaAgent?: number;
+
+  // Laini 4 za Lipa Namba (Merchant Lines - Kupokelea mteja anayetoa kwa Lipa)
+  openingFloatMpesaLipa?: number;
+  openingFloatTigoLipa?: number;
+  openingFloatAirtelLipa?: number;
+  openingFloatHalopesaLipa?: number;
+
+  // Legacy fallback fields
+  openingFloatMpesa?: number;
+  openingFloatTigo?: number;
+  openingFloatAirtel?: number;
+  openingFloatHalopesa?: number;
+  openingFloatBank?: number;
+
   closingCash?: number;
-  closingFloatMpesa?: number;
-  closingFloatTigo?: number;
-  closingFloatAirtel?: number;
-  closingFloatHalopesa?: number;
-  closingFloatBank?: number;
   calculatedCash: number;
   calculatedFloats: {
-    mpesa: number;
-    tigo: number;
-    airtel: number;
-    halopesa: number;
-    bank: number;
+    mpesaAgent?: number;
+    tigoAgent?: number;
+    airtelAgent?: number;
+    halopesaAgent?: number;
+    mpesaLipa?: number;
+    tigoLipa?: number;
+    airtelLipa?: number;
+    halopesaLipa?: number;
+    mpesa?: number;
+    tigo?: number;
+    airtel?: number;
+    halopesa?: number;
+    bank?: number;
   };
   difference?: number; // Over/Short
   status: 'open' | 'closed';
@@ -197,7 +216,32 @@ export interface SyncQueueItem {
 export interface AppUser {
   id: string;
   name: string;
-  role: 'boss' | 'phone_attendant' | 'laundry_attendant' | 'wakala_attendant';
+  role: 'boss' | 'admin' | 'phone_attendant' | 'laundry_attendant' | 'wakala_attendant';
   assignedBranchId?: string;
   pin: string;
 }
+
+// Expenses (Matumizi ya Maduka)
+export type ExpenseCategory = 
+  | 'sabuni_kemikali' 
+  | 'umeme_luku' 
+  | 'maji' 
+  | 'mkaa_pasi' 
+  | 'mifuko_packaging' 
+  | 'matengenezo' 
+  | 'kodi' 
+  | 'posho_mshahara' 
+  | 'other';
+
+export interface Expense {
+  id: string;
+  branchId: string;
+  title: string;
+  category: ExpenseCategory;
+  amount: number;
+  recordedBy?: string;
+  notes?: string;
+  createdAt: string;
+  isSynced: boolean;
+}
+

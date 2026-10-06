@@ -29,6 +29,9 @@ import { WakalaTransactionsList } from './components/Wakala/WakalaTransactionsLi
 
 // Boss Dashboard Components
 import { BossOverview } from './components/BossDashboard/BossOverview';
+import { BossReports } from './components/BossDashboard/BossReports';
+import { BossInventoryControl } from './components/BossDashboard/BossInventoryControl';
+import { BossSecurity } from './components/BossDashboard/BossSecurity';
 import { BranchComparison } from './components/BossDashboard/BranchComparison';
 import { DataManagement } from './components/BossDashboard/DataManagement';
 
@@ -38,6 +41,9 @@ export const App: React.FC = () => {
   });
   const [currentBranchType, setCurrentBranchType] = useState<BranchType>(() => {
     return (localStorage.getItem('active_auth_branch') as BranchType) || 'phone';
+  });
+  const [currentBranchId, setCurrentBranchId] = useState<string>(() => {
+    return localStorage.getItem('active_branch_id') || 'branch_phone_1';
   });
   const [activeTab, setActiveTab] = useState<string>('pos');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState<boolean>(false);
@@ -59,16 +65,18 @@ export const App: React.FC = () => {
   const laundryOrders = useLiveQuery(async () => db.laundryOrders.toArray(), []) || [];
   const readyLaundryCount = laundryOrders.filter(o => o.stage === 'ready').length;
 
-  const handleLoginSuccess = (branchType: BranchType) => {
+  const handleLoginSuccess = (branchType: BranchType, branchId?: string) => {
     setIsAuthenticated(true);
     setCurrentBranchType(branchType);
+    if (branchId) setCurrentBranchId(branchId);
     localStorage.setItem('is_authenticated', 'true');
     localStorage.setItem('active_auth_branch', branchType);
+    if (branchId) localStorage.setItem('active_branch_id', branchId);
 
     if (branchType === 'phone') setActiveTab('pos');
     else if (branchType === 'laundry') setActiveTab('new_order');
     else if (branchType === 'wakala') setActiveTab('quick_log');
-    else if (branchType === 'boss') setActiveTab('overview');
+    else if (branchType === 'boss' || branchType === 'admin') setActiveTab('overview');
   };
 
   const handleLockScreen = () => {
@@ -76,22 +84,33 @@ export const App: React.FC = () => {
     localStorage.removeItem('is_authenticated');
   };
 
-  const handleBranchTypeChange = (newType: BranchType) => {
+  const handleBranchChange = (newType: BranchType, newBranchId?: string) => {
     setCurrentBranchType(newType);
+    if (newBranchId) setCurrentBranchId(newBranchId);
     localStorage.setItem('active_auth_branch', newType);
+    if (newBranchId) localStorage.setItem('active_branch_id', newBranchId);
+
     if (newType === 'phone') setActiveTab('pos');
     else if (newType === 'laundry') setActiveTab('new_order');
     else if (newType === 'wakala') setActiveTab('quick_log');
-    else if (newType === 'boss') setActiveTab('overview');
+    else if (newType === 'boss' || newType === 'admin') setActiveTab('overview');
   };
 
+  // Guard for Boss: redirect away from admin-only tabs
+  useEffect(() => {
+    if (currentBranchType === 'boss' && (activeTab === 'security' || activeTab === 'data_backup')) {
+      setActiveTab('overview');
+    }
+  }, [currentBranchType, activeTab]);
+
   const handleSaleComplete = (sale: Sale) => {
+    const activeBranch = branches.find(b => b.id === sale.branchId || b.id === currentBranchId);
     setReceiptData({
       type: 'phone_sale',
       title: 'Risiti ya Mauzo (Sale Receipt)',
-      branchName: 'Duka la Simu & Vifaa',
-      branchPhone: '+255 712 345 678',
-      branchLocation: 'Mwenge / Mlimani City Branch',
+      branchName: activeBranch?.name || 'Duka la Simu & Vifaa',
+      branchPhone: activeBranch?.phone || '+255 712 345 678',
+      branchLocation: activeBranch?.location || 'Mwanza Branch',
       receiptNumber: sale.saleNumber,
       createdAt: sale.createdAt,
       customerName: sale.customerName,
@@ -113,12 +132,13 @@ export const App: React.FC = () => {
   };
 
   const handleLaundryOrderComplete = (order: LaundryOrder) => {
+    const activeBranch = branches.find(b => b.id === order.branchId || b.id === currentBranchId);
     setReceiptData({
       type: 'laundry_order',
       title: 'Tag ya Nguo (Laundry Slip)',
-      branchName: 'GGS Laundry Service',
-      branchPhone: '0685947264',
-      branchLocation: 'Mahinakati Mwanza',
+      branchName: activeBranch?.name || 'GGS Laundry Service',
+      branchPhone: activeBranch?.phone || '0685947264',
+      branchLocation: activeBranch?.location || 'Mwanza Branch',
       receiptNumber: order.orderNumber,
       tagNumber: order.tagNumber,
       createdAt: order.createdAt,
@@ -196,6 +216,7 @@ export const App: React.FC = () => {
       <PinLogin 
         onLoginSuccess={handleLoginSuccess}
         targetBranchType={currentBranchType}
+        targetBranchId={currentBranchId}
       />
     );
   }
@@ -206,15 +227,16 @@ export const App: React.FC = () => {
       {/* Top Header */}
       <Header
         currentBranchType={currentBranchType}
-        onSelectBranchType={handleBranchTypeChange}
+        currentBranchId={currentBranchId}
+        onSelectBranch={handleBranchChange}
         branches={branches}
         onOpenSyncModal={() => setIsSyncModalOpen(true)}
         onLockScreen={handleLockScreen}
         onOpenLicenseModal={() => setIsLicenseModalOpen(true)}
       />
 
-      {/* Subscription Expiring Soon Alert Banner (if <= 3 days) */}
-      {licenseInfo.isExpiringSoon && (
+      {/* Subscription Expiring Soon Alert Banner (Shown to Boss & Admin if <= 3 days) */}
+      {licenseInfo.isExpiringSoon && (currentBranchType === 'boss' || currentBranchType === 'admin') && (
         <div 
           onClick={() => setIsLicenseModalOpen(true)}
           className="bg-amber-500/20 border-b border-amber-500/40 px-3.5 py-1.5 text-center text-xs text-amber-300 font-bold flex items-center justify-center gap-2 cursor-pointer hover:bg-amber-500/30 transition-colors"
@@ -231,7 +253,6 @@ export const App: React.FC = () => {
           <>
             {activeTab === 'pos' && <PhonePOS onSaleComplete={handleSaleComplete} />}
             {activeTab === 'inventory' && <PhoneInventory />}
-            {activeTab === 'repairs' && <PhoneRepairs onOpenReceipt={handleGenericOpenReceipt} />}
             {activeTab === 'history' && <PhoneHistory onOpenReceipt={handleGenericOpenReceipt} />}
           </>
         )}
@@ -239,8 +260,7 @@ export const App: React.FC = () => {
         {/* Branch 2: GGS Laundry Service */}
         {currentBranchType === 'laundry' && (
           <>
-            {activeTab === 'new_order' && <LaundryNewOrder onOrderComplete={handleLaundryOrderComplete} />}
-            {activeTab === 'pipeline' && <LaundryPipeline onOpenReceipt={handleGenericOpenReceipt} />}
+            {activeTab === 'new_order' && <LaundryNewOrder onOrderComplete={handleLaundryOrderComplete} branchId={currentBranchId} />}
             {activeTab === 'orders_list' && <LaundryHistory onOpenReceipt={handleGenericOpenReceipt} />}
           </>
         )}
@@ -248,21 +268,43 @@ export const App: React.FC = () => {
         {/* Branch 3: M-Pesa & Wakala Kiosk */}
         {currentBranchType === 'wakala' && (
           <>
-            {activeTab === 'quick_log' && <WakalaQuickLog onTxComplete={handleWakalaTxComplete} />}
+            {activeTab === 'quick_log' && <WakalaQuickLog onTxComplete={handleWakalaTxComplete} branchId={currentBranchId} />}
             {activeTab === 'day_balance' && <WakalaDayBalance />}
             {activeTab === 'tx_history' && <WakalaTransactionsList onOpenReceipt={handleGenericOpenReceipt} />}
           </>
         )}
 
-        {/* Boss Central Dashboard */}
+        {/* Boss Dashboard (Business only: Matawi, Ripoti & Faida, Stoo & Bei) */}
         {currentBranchType === 'boss' && (
           <>
             {activeTab === 'overview' && (
               <BossOverview
-                onSelectBranch={handleBranchTypeChange}
+                onSelectBranch={handleBranchChange}
                 onOpenSyncModal={() => setIsSyncModalOpen(true)}
+                onNavigateTab={setActiveTab}
+                onOpenReceipt={handleGenericOpenReceipt}
               />
             )}
+            {activeTab === 'reports' && <BossReports />}
+            {activeTab === 'inventory' && <BossInventoryControl />}
+            {activeTab === 'comparison' && <BranchComparison />}
+          </>
+        )}
+
+        {/* Super Admin Dashboard (Full Access: Matawi, Ripoti, Stoo, PIN & Usalama, Backup & Mfumo) */}
+        {currentBranchType === 'admin' && (
+          <>
+            {activeTab === 'overview' && (
+              <BossOverview
+                onSelectBranch={handleBranchChange}
+                onOpenSyncModal={() => setIsSyncModalOpen(true)}
+                onNavigateTab={setActiveTab}
+                onOpenReceipt={handleGenericOpenReceipt}
+              />
+            )}
+            {activeTab === 'reports' && <BossReports />}
+            {activeTab === 'inventory' && <BossInventoryControl />}
+            {activeTab === 'security' && <BossSecurity />}
             {activeTab === 'comparison' && <BranchComparison />}
             {activeTab === 'data_backup' && <DataManagement />}
           </>

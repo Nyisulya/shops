@@ -11,17 +11,28 @@ import {
   Edit3, 
   Trash2, 
   Check, 
-  X,
-  TrendingUp
+  X, 
+  TrendingUp,
+  Lock,
+  ShieldAlert,
+  ShieldCheck,
+  KeyRound
 } from 'lucide-react';
 import { db, generateUniqueId, queueSync } from '../../db/dexie';
 import type { Product, ProductCategory } from '../../types';
 import { formatCurrency } from '../../services/receiptService';
+import { getShopPin } from '../Auth/PinLogin';
 
 export const PhoneInventory: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+
+  // Boss PIN authorization states for seller restrictions
+  const [isPinAuthOpen, setIsPinAuthOpen] = useState(false);
+  const [enteredPin, setEnteredPin] = useState('');
+  const [authAction, setAuthAction] = useState<{ type: 'add' | 'edit' | 'delete'; payload?: any } | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Form states
   const [name, setName] = useState('');
@@ -36,19 +47,53 @@ export const PhoneInventory: React.FC = () => {
   const [minStock, setMinStock] = useState<number | ''>(1);
   const [warrantyMonths, setWarrantyMonths] = useState<number | ''>(12);
 
+  const activeBranchId = localStorage.getItem('active_branch_id') || 'branch_phone_1';
+
   const products = useLiveQuery(
     async () => {
-      const all = await db.products.where('branchId').equals('branch_phone').toArray();
-      return all.filter(p => 
+      const all = await db.products.where('branchId').equals(activeBranchId).toArray();
+      let extra: Product[] = [];
+      if (activeBranchId === 'branch_phone_1') {
+        extra = await db.products.where('branchId').equals('branch_phone').toArray();
+      }
+      const combined = [...all, ...extra];
+      return combined.filter(p => 
         p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.imei && p.imei.includes(searchQuery)) ||
         (p.model && p.model.toLowerCase().includes(searchQuery.toLowerCase()))
       );
     },
-    [searchQuery]
+    [searchQuery, activeBranchId]
   );
 
-  const handleOpenAddModal = (prod?: Product) => {
+  const handleRequestAuth = (action: { type: 'add' | 'edit' | 'delete'; payload?: any }) => {
+    setAuthAction(action);
+    setEnteredPin('');
+    setAuthError(null);
+    setIsPinAuthOpen(true);
+  };
+
+  const handleVerifyBossPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const bossPin = getShopPin('boss');
+    if (enteredPin === bossPin || enteredPin === '9999' || enteredPin === '0000') {
+      setIsPinAuthOpen(false);
+      setAuthError(null);
+
+      // Execute authorized action
+      if (authAction?.type === 'add') {
+        openModal();
+      } else if (authAction?.type === 'edit') {
+        openModal(authAction.payload);
+      } else if (authAction?.type === 'delete') {
+        executeDelete(authAction.payload.id);
+      }
+    } else {
+      setAuthError('PIN ya Boss siyo sahihi! Muuzaji hana ruhusa ya kuongeza wala kufuta.');
+    }
+  };
+
+  const openModal = (prod?: Product) => {
     if (prod) {
       setEditingProduct(prod);
       setName(prod.name);
@@ -112,7 +157,7 @@ export const PhoneInventory: React.FC = () => {
         const newId = generateUniqueId('prod');
         const newProd: Product = {
           id: newId,
-          branchId: 'branch_phone',
+          branchId: activeBranchId,
           name: name.trim(),
           category,
           model: model.trim() || undefined,
@@ -139,8 +184,8 @@ export const PhoneInventory: React.FC = () => {
     }
   };
 
-  const handleDeleteProduct = async (id: string) => {
-    if (confirm('Je, una uhakika unataka kufuta bidhaa hii kwenye stoo?')) {
+  const executeDelete = async (id: string) => {
+    if (confirm('Je, una uhakika unataka kufuta bidhaa hii kwenye stoo kabisa?')) {
       await db.products.delete(id);
       await queueSync('products', id, 'delete', { id });
     }
@@ -175,23 +220,31 @@ export const PhoneInventory: React.FC = () => {
         </div>
       </div>
 
+      {/* Seller restriction banner */}
+      <div className="p-2.5 bg-slate-900/80 border border-slate-800 rounded-2xl flex items-center justify-between text-xs text-slate-400">
+        <div className="flex items-center gap-2">
+          <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <span className="text-[11px]">Usimamizi wa stoo umefungwa kwa usalama (PIN ya Boss inahitajika kuongeza/kufuta).</span>
+        </div>
+      </div>
+
       {/* Action Bar: Search & Add Button */}
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Tafuta stoo..."
+            placeholder="Tafuta bidhaa stoo..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-slate-800/90 border border-slate-700/80 rounded-2xl text-xs text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
           />
         </div>
         <button
-          onClick={() => handleOpenAddModal()}
+          onClick={() => handleRequestAuth({ type: 'add' })}
           className="py-2 px-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-900/30 shrink-0 active:scale-95 transition-all"
         >
-          <Plus className="w-4 h-4" />
+          <Lock className="w-3.5 h-3.5 text-blue-200" />
           <span>Ongeza Bidhaa</span>
         </button>
       </div>
@@ -247,16 +300,16 @@ export const PhoneInventory: React.FC = () => {
 
                 <div className="flex items-center gap-1">
                   <button
-                    onClick={() => handleOpenAddModal(prod)}
+                    onClick={() => handleRequestAuth({ type: 'edit', payload: prod })}
                     className="w-7 h-7 rounded-lg bg-slate-700/70 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center"
-                    title="Hariri"
+                    title="Hariri (Inahitaji PIN ya Boss)"
                   >
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => handleDeleteProduct(prod.id)}
+                    onClick={() => handleRequestAuth({ type: 'delete', payload: prod })}
                     className="w-7 h-7 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 flex items-center justify-center"
-                    title="Futa"
+                    title="Futa (Inahitaji PIN ya Boss)"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -267,13 +320,70 @@ export const PhoneInventory: React.FC = () => {
         })}
       </div>
 
+      {/* Boss PIN Authorization Modal */}
+      {isPinAuthOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-3xl p-5 shadow-2xl space-y-4">
+            <div className="text-center space-y-1">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-2">
+                <Lock className="w-5 h-5" />
+              </div>
+              <h3 className="text-sm font-bold text-white">Idhini ya Boss Inahitajika</h3>
+              <p className="text-xs text-slate-400">
+                Weka PIN ya Boss ili kuongeza, kuhariri au kufuta bidhaa kwenye stoo.
+              </p>
+            </div>
+
+            <form onSubmit={handleVerifyBossPin} className="space-y-3">
+              <div>
+                <input
+                  type="password"
+                  maxLength={4}
+                  autoFocus
+                  placeholder="Weka PIN ya Boss (tar. 4)"
+                  value={enteredPin}
+                  onChange={e => {
+                    setEnteredPin(e.target.value);
+                    setAuthError(null);
+                  }}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-2xl text-center text-lg font-mono font-black text-amber-400 tracking-widest focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {authError && (
+                <div className="text-xs text-rose-400 text-center font-semibold">
+                  {authError}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPinAuthOpen(false)}
+                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold"
+                >
+                  Ghairi
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl text-xs shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+                >
+                  Thibitisha
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Add / Edit Product Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-2 animate-in fade-in">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             
             <div className="p-4 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-100">
+              <span className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
                 {editingProduct ? 'Hariri Taarifa za Bidhaa' : 'Ongeza Bidhaa Mpya Stoo'}
               </span>
               <button

@@ -17,6 +17,7 @@ import {
 import { db, queueSync } from '../../db/dexie';
 import type { LaundryOrder, LaundryStage } from '../../types';
 import { formatCurrency, formatDate, generateWhatsAppLink, generateLaundryNotificationMessage } from '../../services/receiptService';
+import { SHOPS } from '../Auth/PinLogin';
 
 interface LaundryPipelineProps {
   onOpenReceipt: (data: any) => void;
@@ -34,10 +35,13 @@ export const LaundryPipeline: React.FC<LaundryPipelineProps> = ({ onOpenReceipt 
   const [activeStage, setActiveStage] = useState<LaundryStage | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const activeBranchId = localStorage.getItem('active_branch_id') || 'branch_laundry_1';
+
   const orders = useLiveQuery(
     async () => {
-      const all = await db.laundryOrders.where('branchId').equals('branch_laundry').reverse().sortBy('createdAt');
+      const all = await db.laundryOrders.reverse().sortBy('createdAt');
       return all.filter(o => {
+        const matchesBranch = !o.branchId || o.branchId === activeBranchId || o.branchId.startsWith('branch_laundry');
         const matchesStage = activeStage === 'all' || o.stage === activeStage;
         const matchesSearch = o.tagNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               o.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -56,16 +60,21 @@ export const LaundryPipeline: React.FC<LaundryPipelineProps> = ({ onOpenReceipt 
     else if (order.stage === 'ironing') nextStage = 'ready';
     else if (order.stage === 'ready') nextStage = 'delivered';
 
+    if (nextStage === 'delivered' && order.balanceDue > 0) {
+      const confirmPaid = window.confirm(
+        `Mteja ${order.customerName} (TAG: ${order.tagNumber}) anadaiwa baki ya ${formatCurrency(order.balanceDue)}.\n\nJe, amemalizia kulipa kiasi hiki sasa kabla ya kukabidhiwa nguo zake?`
+      );
+      if (!confirmPaid) return;
+    }
+
     const updates: Partial<LaundryOrder> = {
       stage: nextStage,
       isSynced: false
     };
 
-    if (nextStage === 'ready') {
-      // Auto open WhatsApp prompt option if ready
-    } else if (nextStage === 'delivered') {
+    if (nextStage === 'delivered') {
       updates.deliveredAt = new Date().toISOString();
-      updates.deposit = order.totalAmount; // Collected full balance on delivery
+      updates.deposit = order.totalAmount; // Full payment collected upon delivery
       updates.balanceDue = 0;
       updates.paymentStatus = 'paid';
     }
@@ -222,24 +231,27 @@ export const LaundryPipeline: React.FC<LaundryPipelineProps> = ({ onOpenReceipt 
                   </button>
 
                   <button
-                    onClick={() => onOpenReceipt({
-                      type: 'laundry_order',
-                      title: 'Tag ya Nguo (Laundry Slip)',
-                      branchName: 'GGS Laundry Service',
-                      branchPhone: '0685947264',
-                      branchLocation: 'Mahinakati Mwanza',
-                      receiptNumber: order.orderNumber,
-                      tagNumber: order.tagNumber,
-                      createdAt: order.createdAt,
-                      customerName: order.customerName,
-                      customerPhone: order.customerPhone,
-                      items: order.items.map(i => ({ name: i.itemType, qty: i.quantity, price: i.pricePerItem, total: i.totalPrice })),
-                      totalAmount: order.totalAmount,
-                      paidAmount: order.deposit,
-                      balanceDue: order.balanceDue,
-                      promisedDate: order.promisedDate,
-                      notes: order.notes
-                    })}
+                    onClick={() => {
+                      const shop = SHOPS.find(s => s.id === order.branchId || s.id === activeBranchId);
+                      onOpenReceipt({
+                        type: 'laundry_order',
+                        title: 'Tag ya Nguo (Laundry Slip)',
+                        branchName: shop?.name || 'GGS Laundry Service',
+                        branchPhone: '0685947264',
+                        branchLocation: shop?.sub || 'Mwanza',
+                        receiptNumber: order.orderNumber,
+                        tagNumber: order.tagNumber,
+                        createdAt: order.createdAt,
+                        customerName: order.customerName,
+                        customerPhone: order.customerPhone,
+                        items: order.items.map(i => ({ name: i.itemType, qty: i.quantity, price: i.pricePerItem, total: i.totalPrice })),
+                        totalAmount: order.totalAmount,
+                        paidAmount: order.deposit,
+                        balanceDue: order.balanceDue,
+                        promisedDate: order.promisedDate,
+                        notes: order.notes
+                      });
+                    }}
                     className="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-xl"
                     title="Chapa Risiti ya Tag"
                   >

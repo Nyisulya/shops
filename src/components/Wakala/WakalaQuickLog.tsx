@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { 
   Wallet, 
   ArrowDownLeft, 
@@ -13,10 +14,17 @@ import {
   QrCode,
   Table as TableIcon,
   HelpCircle,
-  TrendingUp
+  TrendingUp,
+  Sun,
+  Scale,
+  Edit3,
+  Save,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { db, generateUniqueId, queueSync } from '../../db/dexie';
-import type { WakalaProvider, WakalaTxType, WakalaTransaction, WakalaWithdrawalMethod } from '../../types';
+import type { WakalaProvider, WakalaTxType, WakalaTransaction, WakalaWithdrawalMethod, WakalaDayLog } from '../../types';
 import { formatCurrency } from '../../services/receiptService';
 import { findLipaTariff } from '../../services/lipaTariffService';
 import { LipaTariffModal } from './LipaTariffModal';
@@ -24,6 +32,7 @@ import confetti from 'canvas-confetti';
 
 interface WakalaQuickLogProps {
   onTxComplete: (tx: WakalaTransaction) => void;
+  branchId?: string;
 }
 
 const PROVIDERS: { id: WakalaProvider; name: string; color: string; badge: string; iconBg: string }[] = [
@@ -31,13 +40,260 @@ const PROVIDERS: { id: WakalaProvider; name: string; color: string; badge: strin
   { id: 'tigo', name: 'Tigo Pesa', color: 'border-blue-500/40 bg-blue-500/10 text-blue-400', badge: 'bg-blue-600', iconBg: 'bg-blue-600' },
   { id: 'airtel', name: 'Airtel Money', color: 'border-rose-500/40 bg-rose-500/10 text-rose-400', badge: 'bg-rose-600', iconBg: 'bg-rose-600' },
   { id: 'halopesa', name: 'HaloPesa', color: 'border-amber-500/40 bg-amber-500/10 text-amber-400', badge: 'bg-amber-600', iconBg: 'bg-amber-600' },
-  { id: 'crdb', name: 'CRDB Wakala', color: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400', badge: 'bg-emerald-600', iconBg: 'bg-emerald-600' },
-  { id: 'nmb', name: 'NMB Wakala', color: 'border-blue-700/40 bg-blue-700/10 text-blue-300', badge: 'bg-blue-800', iconBg: 'bg-blue-800' },
 ];
 
 const PRESET_AMOUNTS = [5000, 10000, 20000, 50000, 100000, 200000];
 
-export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete }) => {
+export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete, branchId = 'branch_wakala_1' }) => {
+  const todayDate = new Date().toISOString().split('T')[0];
+
+  // Live queries for Morning Opening Balance and Today's Transactions
+  const currentDayLog = useLiveQuery(
+    async () => {
+      return await db.wakalaDayLogs.where('date').equals(todayDate).first();
+    },
+    [todayDate]
+  );
+
+  const todayTransactions = useLiveQuery(
+    async () => {
+      const all = await db.wakalaTransactions.toArray();
+      return all.filter(tx => tx.createdAt.startsWith(todayDate));
+    },
+    [todayDate]
+  );
+
+  // Opening Float Setup States - Cash + 4 Agent Lines + 4 Lipa Lines
+  const [openingCashInput, setOpeningCashInput] = useState<number | ''>(500000);
+  
+  // 4 Laini za Wakala Kawaida (kumuwekea mteja)
+  const [openingMpesaAgentInput, setOpeningMpesaAgentInput] = useState<number | ''>(800000);
+  const [openingTigoAgentInput, setOpeningTigoAgentInput] = useState<number | ''>(500000);
+  const [openingAirtelAgentInput, setOpeningAirtelAgentInput] = useState<number | ''>(300000);
+  const [openingHalopesaAgentInput, setOpeningHalopesaAgentInput] = useState<number | ''>(200000);
+
+  // 4 Laini za Lipa Namba (kupokelea mteja anayetoa kwa lipa)
+  const [openingMpesaLipaInput, setOpeningMpesaLipaInput] = useState<number | ''>(700000);
+  const [openingTigoLipaInput, setOpeningTigoLipaInput] = useState<number | ''>(300000);
+  const [openingAirtelLipaInput, setOpeningAirtelLipaInput] = useState<number | ''>(300000);
+  const [openingHalopesaLipaInput, setOpeningHalopesaLipaInput] = useState<number | ''>(100000);
+
+  const [floatViewMode, setFloatViewMode] = useState<'all' | 'agent' | 'lipa'>('all');
+  const [isEditingMorningBalance, setIsEditingMorningBalance] = useState(false);
+  const [morningSavedSuccess, setMorningSavedSuccess] = useState(false);
+
+  // Sync inputs with DB log when loaded
+  useEffect(() => {
+    if (currentDayLog) {
+      setOpeningCashInput(currentDayLog.openingCash);
+      
+      setOpeningMpesaAgentInput(currentDayLog.openingFloatMpesaAgent ?? currentDayLog.openingFloatMpesa ?? 800000);
+      setOpeningTigoAgentInput(currentDayLog.openingFloatTigoAgent ?? currentDayLog.openingFloatTigo ?? 500000);
+      setOpeningAirtelAgentInput(currentDayLog.openingFloatAirtelAgent ?? currentDayLog.openingFloatAirtel ?? 300000);
+      setOpeningHalopesaAgentInput(currentDayLog.openingFloatHalopesaAgent ?? currentDayLog.openingFloatHalopesa ?? 200000);
+
+      setOpeningMpesaLipaInput(currentDayLog.openingFloatMpesaLipa ?? 700000);
+      setOpeningTigoLipaInput(currentDayLog.openingFloatTigoLipa ?? 300000);
+      setOpeningAirtelLipaInput(currentDayLog.openingFloatAirtelLipa ?? 300000);
+      setOpeningHalopesaLipaInput(currentDayLog.openingFloatHalopesaLipa ?? 100000);
+    }
+  }, [currentDayLog]);
+
+  // Live Balance calculations for all 8 lines throughout the day
+  const liveBalances = useMemo(() => {
+    const baseCash = currentDayLog ? currentDayLog.openingCash : (Number(openingCashInput) || 0);
+
+    // 4 Agent Lines
+    const baseMpesaAgent = currentDayLog 
+      ? (currentDayLog.openingFloatMpesaAgent ?? currentDayLog.openingFloatMpesa ?? 800000) 
+      : (Number(openingMpesaAgentInput) || 0);
+    const baseTigoAgent = currentDayLog 
+      ? (currentDayLog.openingFloatTigoAgent ?? currentDayLog.openingFloatTigo ?? 500000) 
+      : (Number(openingTigoAgentInput) || 0);
+    const baseAirtelAgent = currentDayLog 
+      ? (currentDayLog.openingFloatAirtelAgent ?? currentDayLog.openingFloatAirtel ?? 300000) 
+      : (Number(openingAirtelAgentInput) || 0);
+    const baseHalopesaAgent = currentDayLog 
+      ? (currentDayLog.openingFloatHalopesaAgent ?? currentDayLog.openingFloatHalopesa ?? 200000) 
+      : (Number(openingHalopesaAgentInput) || 0);
+
+    // 4 Lipa Lines
+    const baseMpesaLipa = currentDayLog 
+      ? (currentDayLog.openingFloatMpesaLipa ?? 700000) 
+      : (Number(openingMpesaLipaInput) || 0);
+    const baseTigoLipa = currentDayLog 
+      ? (currentDayLog.openingFloatTigoLipa ?? 300000) 
+      : (Number(openingTigoLipaInput) || 0);
+    const baseAirtelLipa = currentDayLog 
+      ? (currentDayLog.openingFloatAirtelLipa ?? 300000) 
+      : (Number(openingAirtelLipaInput) || 0);
+    const baseHalopesaLipa = currentDayLog 
+      ? (currentDayLog.openingFloatHalopesaLipa ?? 100000) 
+      : (Number(openingHalopesaLipaInput) || 0);
+
+    let netCashChange = 0;
+    let netMpesaAgentChange = 0;
+    let netTigoAgentChange = 0;
+    let netAirtelAgentChange = 0;
+    let netHalopesaAgentChange = 0;
+
+    let netMpesaLipaChange = 0;
+    let netTigoLipaChange = 0;
+    let netAirtelLipaChange = 0;
+    let netHalopesaLipaChange = 0;
+
+    let totalLipaProfitToday = 0;
+
+    (todayTransactions || []).forEach(tx => {
+      const amt = tx.amount;
+      const isLipa = tx.type === 'withdrawal' && tx.withdrawalMethod === 'lipa_namba';
+      const fee = tx.wakalaFee || 0;
+
+      if (isLipa) {
+        // Customer sends to Lipa Namba till (+amt or +amt+fee) and takes cash out from drawer
+        totalLipaProfitToday += fee;
+        netCashChange -= amt;
+
+        const lipaReceived = amt + fee;
+        if (tx.provider === 'mpesa') netMpesaLipaChange += lipaReceived;
+        else if (tx.provider === 'tigo') netTigoLipaChange += lipaReceived;
+        else if (tx.provider === 'airtel') netAirtelLipaChange += lipaReceived;
+        else if (tx.provider === 'halopesa') netHalopesaLipaChange += lipaReceived;
+      } else if (tx.type === 'withdrawal') {
+        // Kutoa Kawaida via Wakala Agent Line: float comes to Agent line, cash leaves drawer
+        netCashChange -= amt;
+        if (tx.provider === 'mpesa') netMpesaAgentChange += amt;
+        else if (tx.provider === 'tigo') netTigoAgentChange += amt;
+        else if (tx.provider === 'airtel') netAirtelAgentChange += amt;
+        else if (tx.provider === 'halopesa') netHalopesaAgentChange += amt;
+      } else if (tx.type === 'deposit') {
+        // Kuweka Pesa: customer gives cash into drawer (+amt), float leaves Agent line (-amt)
+        netCashChange += amt;
+        if (tx.provider === 'mpesa') netMpesaAgentChange -= amt;
+        else if (tx.provider === 'tigo') netTigoAgentChange -= amt;
+        else if (tx.provider === 'airtel') netAirtelAgentChange -= amt;
+        else if (tx.provider === 'halopesa') netHalopesaAgentChange -= amt;
+      }
+    });
+
+    const currentCash = baseCash + netCashChange;
+
+    const currentMpesaAgent = baseMpesaAgent + netMpesaAgentChange;
+    const currentTigoAgent = baseTigoAgent + netTigoAgentChange;
+    const currentAirtelAgent = baseAirtelAgent + netAirtelAgentChange;
+    const currentHalopesaAgent = baseHalopesaAgent + netHalopesaAgentChange;
+    const totalAgentFloat = currentMpesaAgent + currentTigoAgent + currentAirtelAgent + currentHalopesaAgent;
+
+    const currentMpesaLipa = baseMpesaLipa + netMpesaLipaChange;
+    const currentTigoLipa = baseTigoLipa + netTigoLipaChange;
+    const currentAirtelLipa = baseAirtelLipa + netAirtelLipaChange;
+    const currentHalopesaLipa = baseHalopesaLipa + netHalopesaLipaChange;
+    const totalLipaFloat = currentMpesaLipa + currentTigoLipa + currentAirtelLipa + currentHalopesaLipa;
+
+    const currentTotalFloat = totalAgentFloat + totalLipaFloat;
+    const currentTotalCapital = currentCash + currentTotalFloat;
+
+    return {
+      currentCash,
+      // 4 Agent lines
+      currentMpesaAgent,
+      currentTigoAgent,
+      currentAirtelAgent,
+      currentHalopesaAgent,
+      totalAgentFloat,
+      // 4 Lipa lines
+      currentMpesaLipa,
+      currentTigoLipa,
+      currentAirtelLipa,
+      currentHalopesaLipa,
+      totalLipaFloat,
+      // Aggregates
+      currentTotalFloat,
+      currentTotalCapital,
+      totalLipaProfitToday,
+      hasRecordedMorning: !!currentDayLog
+    };
+  }, [
+    currentDayLog, 
+    openingCashInput, 
+    openingMpesaAgentInput, 
+    openingTigoAgentInput, 
+    openingAirtelAgentInput, 
+    openingHalopesaAgentInput,
+    openingMpesaLipaInput,
+    openingTigoLipaInput,
+    openingAirtelLipaInput,
+    openingHalopesaLipaInput,
+    todayTransactions
+  ]);
+
+  const handleSaveMorningBalance = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const logId = currentDayLog ? currentDayLog.id : generateUniqueId('wlog');
+      const cashVal = Number(openingCashInput) || 0;
+      
+      const mpesaAgentVal = Number(openingMpesaAgentInput) || 0;
+      const tigoAgentVal = Number(openingTigoAgentInput) || 0;
+      const airtelAgentVal = Number(openingAirtelAgentInput) || 0;
+      const halopesaAgentVal = Number(openingHalopesaAgentInput) || 0;
+
+      const mpesaLipaVal = Number(openingMpesaLipaInput) || 0;
+      const tigoLipaVal = Number(openingTigoLipaInput) || 0;
+      const airtelLipaVal = Number(openingAirtelLipaInput) || 0;
+      const halopesaLipaVal = Number(openingHalopesaLipaInput) || 0;
+
+      const newLog: WakalaDayLog = {
+        id: logId,
+        branchId,
+        date: todayDate,
+        openingCash: cashVal,
+        openingFloatMpesaAgent: mpesaAgentVal,
+        openingFloatTigoAgent: tigoAgentVal,
+        openingFloatAirtelAgent: airtelAgentVal,
+        openingFloatHalopesaAgent: halopesaAgentVal,
+        openingFloatMpesaLipa: mpesaLipaVal,
+        openingFloatTigoLipa: tigoLipaVal,
+        openingFloatAirtelLipa: airtelLipaVal,
+        openingFloatHalopesaLipa: halopesaLipaVal,
+        // Compatibility
+        openingFloatMpesa: mpesaAgentVal + mpesaLipaVal,
+        openingFloatTigo: tigoAgentVal + tigoLipaVal,
+        openingFloatAirtel: airtelAgentVal + airtelLipaVal,
+        openingFloatHalopesa: halopesaAgentVal + halopesaLipaVal,
+        openingFloatBank: 0,
+        calculatedCash: liveBalances.currentCash,
+        calculatedFloats: {
+          mpesaAgent: liveBalances.currentMpesaAgent,
+          tigoAgent: liveBalances.currentTigoAgent,
+          airtelAgent: liveBalances.currentAirtelAgent,
+          halopesaAgent: liveBalances.currentHalopesaAgent,
+          mpesaLipa: liveBalances.currentMpesaLipa,
+          tigoLipa: liveBalances.currentTigoLipa,
+          airtelLipa: liveBalances.currentAirtelLipa,
+          halopesaLipa: liveBalances.currentHalopesaLipa,
+          mpesa: liveBalances.currentMpesaAgent + liveBalances.currentMpesaLipa,
+          tigo: liveBalances.currentTigoAgent + liveBalances.currentTigoLipa,
+          airtel: liveBalances.currentAirtelAgent + liveBalances.currentAirtelLipa,
+          halopesa: liveBalances.currentHalopesaAgent + liveBalances.currentHalopesaLipa,
+          bank: 0
+        },
+        status: 'open',
+        createdAt: currentDayLog ? currentDayLog.createdAt : new Date().toISOString(),
+        isSynced: false
+      };
+
+      await db.wakalaDayLogs.put(newLog);
+      await queueSync('wakalaDayLogs', logId, currentDayLog ? 'update' : 'create', newLog);
+      setIsEditingMorningBalance(false);
+      setMorningSavedSuccess(true);
+      setTimeout(() => setMorningSavedSuccess(false), 3000);
+    } catch (err) {
+      console.error('Error saving morning balance:', err);
+      alert('Hitilafu katika kuhifadhi salio la asubuhi.');
+    }
+  };
+
   const [provider, setProvider] = useState<WakalaProvider>('mpesa');
   const [txType, setTxType] = useState<WakalaTxType>('withdrawal');
   const [withdrawalMethod, setWithdrawalMethod] = useState<WakalaWithdrawalMethod>('lipa_namba');
@@ -55,32 +311,12 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete }) 
   const standardWakalaFee = lipaTariff ? lipaTariff.wakalaTakes : 0;
   const actualWakalaFee = customWakalaFee !== '' ? Number(customWakalaFee) : standardWakalaFee;
 
-  // Calculate commission / earnings
-  const calculateCommission = (amt: number, type: WakalaTxType, method: WakalaWithdrawalMethod): number => {
-    if (!amt || amt <= 0) return 0;
-    if (type === 'withdrawal') {
-      if (method === 'lipa_namba') {
-        // In Lipa Namba, Wakala keeps the fee directly as profit
-        return actualWakalaFee;
-      }
-      // Traditional agent withdrawal commission
-      if (amt <= 10000) return 250;
-      if (amt <= 50000) return 650;
-      if (amt <= 100000) return 1200;
-      if (amt <= 300000) return 2200;
-      return 3500;
-    } else if (type === 'deposit') {
-      if (amt <= 10000) return 150;
-      if (amt <= 50000) return 400;
-      if (amt <= 100000) return 700;
-      if (amt <= 300000) return 1300;
-      return 2000;
-    }
-    return 300;
-  };
+  // IMPORTANT: Only Lipa Namba has known upfront profit (Wakala fee).
+  // Non-Lipa transactions (kutoa kawaida na kuweka) do not have speculative guesses.
+  const isLipaNamba = txType === 'withdrawal' && withdrawalMethod === 'lipa_namba';
+  const calculatedCommission = isLipaNamba ? actualWakalaFee : 0;
 
-  const calculatedCommission = calculateCommission(currentAmountNum, txType, withdrawalMethod);
-  const totalToPayByCustomer = txType === 'withdrawal' && withdrawalMethod === 'lipa_namba'
+  const totalToPayByCustomer = isLipaNamba
     ? currentAmountNum + actualWakalaFee
     : currentAmountNum;
 
@@ -99,15 +335,15 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete }) 
 
       const newTx: WakalaTransaction = {
         id: txId,
-        branchId: 'branch_wakala',
+        branchId,
         transactionNumber,
         provider,
         type: txType,
         withdrawalMethod: txType === 'withdrawal' ? withdrawalMethod : undefined,
         amount: currentAmountNum,
-        fee: txType === 'withdrawal' && withdrawalMethod === 'lipa_namba' ? (lipaTariff?.lipaCharge || 0) : 0,
-        wakalaFee: txType === 'withdrawal' && withdrawalMethod === 'lipa_namba' ? actualWakalaFee : undefined,
-        lipaCharge: txType === 'withdrawal' && withdrawalMethod === 'lipa_namba' ? (lipaTariff?.lipaCharge || 0) : undefined,
+        fee: isLipaNamba ? (lipaTariff?.lipaCharge || 0) : 0,
+        wakalaFee: isLipaNamba ? actualWakalaFee : undefined,
+        lipaCharge: isLipaNamba ? (lipaTariff?.lipaCharge || 0) : undefined,
         totalCollectedFromCustomer: totalToPayByCustomer,
         commission: calculatedCommission,
         customerPhone: customerPhone.trim() || undefined,
@@ -142,7 +378,309 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete }) 
 
   return (
     <div className="space-y-3.5 pb-24">
-      
+      {/* 1. MORNING OPENING FLOAT & LIVE BALANCES SECTION */}
+      <div className="bg-slate-900/90 border border-slate-700/80 rounded-2xl p-3.5 space-y-3 shadow-lg">
+        {/* Header Bar */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+              <Sun className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs font-black text-slate-100 flex items-center gap-1.5">
+                <span>Salio la Kuanzia Asubuhi (Leo)</span>
+                {liveBalances.hasRecordedMorning && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <CheckCircle2 className="w-2.5 h-2.5" /> Tayari
+                  </span>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                {liveBalances.hasRecordedMorning ? 'Fuatilia cash na float inayobadilika mubashara' : 'Weka cash na float ulizoanza nazo leo'}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsEditingMorningBalance(prev => !prev)}
+            className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 transition-colors"
+          >
+            <Edit3 className="w-3 h-3 text-amber-400" />
+            <span>{isEditingMorningBalance ? 'Funga' : (liveBalances.hasRecordedMorning ? 'Badilisha' : 'Rekodi')}</span>
+          </button>
+        </div>
+
+        {/* Live Capital Summary Strip (Always shown when not editing) */}
+        {!isEditingMorningBalance && (
+          <div className="space-y-2.5 pt-1 border-t border-slate-800/80">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+              <div className="bg-slate-800/90 p-2 rounded-xl border border-emerald-500/30">
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Cash Drooni Sasa</div>
+                <div className="text-xs sm:text-sm font-black text-emerald-400 mt-0.5">
+                  {formatCurrency(liveBalances.currentCash)}
+                </div>
+              </div>
+              <div className="bg-slate-800/90 p-2 rounded-xl border border-blue-500/30">
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Float Wakala (Laini 4)</div>
+                <div className="text-xs sm:text-sm font-black text-blue-400 mt-0.5">
+                  {formatCurrency(liveBalances.totalAgentFloat)}
+                </div>
+              </div>
+              <div className="bg-slate-800/90 p-2 rounded-xl border border-indigo-500/30">
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Float Lipa (Laini 4)</div>
+                <div className="text-xs sm:text-sm font-black text-indigo-400 mt-0.5">
+                  {formatCurrency(liveBalances.totalLipaFloat)}
+                </div>
+              </div>
+              <div className="bg-slate-800/90 p-2 rounded-xl border border-amber-500/30">
+                <div className="text-[9px] text-slate-400 font-bold uppercase">Mtaji Wote (Cash+Float)</div>
+                <div className="text-xs sm:text-sm font-black text-amber-300 mt-0.5">
+                  {formatCurrency(liveBalances.currentTotalCapital)}
+                </div>
+              </div>
+            </div>
+
+            {/* View Mode Filter Tabs */}
+            <div className="flex items-center justify-between gap-1 pt-1">
+              <span className="text-[10px] font-bold text-slate-400">Angalia Salio la Laini:</span>
+              <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setFloatViewMode('all')}
+                  className={`px-2 py-0.5 rounded font-bold transition-all ${
+                    floatViewMode === 'all' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  Laini Zote (8)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFloatViewMode('agent')}
+                  className={`px-2 py-0.5 rounded font-bold transition-all ${
+                    floatViewMode === 'agent' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  📱 Wakala (4)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFloatViewMode('lipa')}
+                  className={`px-2 py-0.5 rounded font-bold transition-all ${
+                    floatViewMode === 'lipa' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  🏷️ Lipa Namba (4)
+                </button>
+              </div>
+            </div>
+
+            {/* Individual Network Floats Breakdown - 4 Agent Lines */}
+            {(floatViewMode === 'all' || floatViewMode === 'agent') && (
+              <div className="space-y-1">
+                <div className="text-[9px] font-extrabold uppercase text-blue-400 tracking-wider flex items-center gap-1">
+                  <span>📱 Laini 4 za Wakala Kawaida (Kumuwekea Mteja)</span>
+                  <span className="text-slate-400 font-normal">| Jumla: {formatCurrency(liveBalances.totalAgentFloat)}</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
+                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-red-500/20 flex justify-between items-center">
+                    <span className="text-red-400 font-bold truncate">Voda Wakala:</span>
+                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentMpesaAgent)}</span>
+                  </div>
+                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-blue-500/20 flex justify-between items-center">
+                    <span className="text-blue-400 font-bold truncate">Tigo Wakala:</span>
+                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentTigoAgent)}</span>
+                  </div>
+                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-rose-500/20 flex justify-between items-center">
+                    <span className="text-rose-400 font-bold truncate">Airtel Wakala:</span>
+                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentAirtelAgent)}</span>
+                  </div>
+                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-amber-500/20 flex justify-between items-center">
+                    <span className="text-amber-400 font-bold truncate">Halotel Wakala:</span>
+                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentHalopesaAgent)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Individual Network Floats Breakdown - 4 Lipa Lines */}
+            {(floatViewMode === 'all' || floatViewMode === 'lipa') && (
+              <div className="space-y-1 pt-1">
+                <div className="text-[9px] font-extrabold uppercase text-emerald-400 tracking-wider flex items-center gap-1">
+                  <span>🏷️ Laini 4 za Lipa Namba (Kupokea Mteja Anayetoa Lipa)</span>
+                  <span className="text-slate-400 font-normal">| Jumla: {formatCurrency(liveBalances.totalLipaFloat)}</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
+                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-red-500/20 flex justify-between items-center">
+                    <span className="text-red-400 font-bold truncate">Voda Lipa:</span>
+                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentMpesaLipa)}</span>
+                  </div>
+                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-blue-500/20 flex justify-between items-center">
+                    <span className="text-blue-400 font-bold truncate">Tigo Lipa:</span>
+                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentTigoLipa)}</span>
+                  </div>
+                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-rose-500/20 flex justify-between items-center">
+                    <span className="text-rose-400 font-bold truncate">Airtel Lipa:</span>
+                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentAirtelLipa)}</span>
+                  </div>
+                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-amber-500/20 flex justify-between items-center">
+                    <span className="text-amber-400 font-bold truncate">Halotel Lipa:</span>
+                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentHalopesaLipa)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Morning Setup Form (when editing or first time) */}
+        {isEditingMorningBalance && (
+          <form onSubmit={handleSaveMorningBalance} className="space-y-3.5 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-amber-300">
+                Salio la Kuanzia Asubuhi (Laini Zote 8 + Cash Drooni):
+              </span>
+              <span className="text-[10px] text-slate-400">Weka kiasi kilichopo kila laini</span>
+            </div>
+
+            {/* 1. Cash In Drawer */}
+            <div className="bg-slate-950/80 p-2.5 rounded-xl border border-emerald-500/30">
+              <label className="block text-[11px] font-extrabold text-emerald-400 mb-1">
+                💵 Cash Drooni / Mkononi (TZS):
+              </label>
+              <input
+                type="number"
+                value={openingCashInput}
+                onChange={e => setOpeningCashInput(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="0"
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-sm text-emerald-300 font-black focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            {/* 2. Laini 4 za Wakala Kawaida */}
+            <div className="p-2.5 bg-blue-950/20 rounded-xl border border-blue-500/30 space-y-2">
+              <div className="text-[11px] font-extrabold text-blue-300 flex items-center gap-1.5">
+                <span>📱 1. Laini 4 za Wakala Kawaida (Kumuwekea Mteja)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label className="block text-[10px] font-bold text-red-400 mb-0.5">Vodacom Wakala:</label>
+                  <input
+                    type="number"
+                    value={openingMpesaAgentInput}
+                    onChange={e => setOpeningMpesaAgentInput(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-bold focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-blue-400 mb-0.5">Tigo Pesa Wakala:</label>
+                  <input
+                    type="number"
+                    value={openingTigoAgentInput}
+                    onChange={e => setOpeningTigoAgentInput(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-bold focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-rose-400 mb-0.5">Airtel Money Wakala:</label>
+                  <input
+                    type="number"
+                    value={openingAirtelAgentInput}
+                    onChange={e => setOpeningAirtelAgentInput(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-bold focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-amber-400 mb-0.5">HaloPesa Wakala:</label>
+                  <input
+                    type="number"
+                    value={openingHalopesaAgentInput}
+                    onChange={e => setOpeningHalopesaAgentInput(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Laini 4 za Lipa Namba */}
+            <div className="p-2.5 bg-emerald-950/20 rounded-xl border border-emerald-500/30 space-y-2">
+              <div className="text-[11px] font-extrabold text-emerald-300 flex items-center gap-1.5">
+                <span>🏷️ 2. Laini 4 za Lipa Namba (Kupokea Mteja Anayetoa Lipa)</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label className="block text-[10px] font-bold text-red-400 mb-0.5">Vodacom Lipa Namba:</label>
+                  <input
+                    type="number"
+                    value={openingMpesaLipaInput}
+                    onChange={e => setOpeningMpesaLipaInput(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-bold focus:outline-none focus:border-red-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-blue-400 mb-0.5">Tigo Lipa Namba:</label>
+                  <input
+                    type="number"
+                    value={openingTigoLipaInput}
+                    onChange={e => setOpeningTigoLipaInput(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-bold focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-rose-400 mb-0.5">Airtel Lipa Namba:</label>
+                  <input
+                    type="number"
+                    value={openingAirtelLipaInput}
+                    onChange={e => setOpeningAirtelLipaInput(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-bold focus:outline-none focus:border-rose-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-amber-400 mb-0.5">Halotel Lipa Namba:</label>
+                  <input
+                    type="number"
+                    value={openingHalopesaLipaInput}
+                    onChange={e => setOpeningHalopesaLipaInput(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="0"
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-100 font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="submit"
+                className="flex-1 py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-md active:scale-95"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>Hifadhi Salio la Laini Zote 8</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingMorningBalance(false)}
+                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs rounded-xl"
+              >
+                Ghairi
+              </button>
+            </div>
+          </form>
+        )}
+
+        {morningSavedSuccess && (
+          <div className="p-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-xs font-bold text-center animate-bounce">
+            ✓ Salio la kuanzia asubuhi limehifadhiwa vizuri!
+          </div>
+        )}
+      </div>
+
       {/* Transaction Type Tabs: Kutoa vs Kuweka */}
       <div className="grid grid-cols-2 gap-2">
         <button
@@ -218,18 +756,26 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete }) 
             </button>
           </div>
 
-          {withdrawalMethod === 'lipa_namba' && (
-            <div className="text-[10px] text-emerald-200/90 bg-emerald-900/30 p-2 rounded-xl border border-emerald-500/20">
-              💡 Mteja anatuma pesa kwenye <b>Lipa Namba ya Wakala</b>, na mfumo unakokotoa ada ya <b>"Wakala Anachukua"</b> na makato ya mtandao kiotomatiki.
-            </div>
-          )}
         </div>
       )}
 
       {/* Provider Selector */}
       <div className="space-y-1.5">
-        <div className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Chagua Mtandao / Benki:</div>
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+        <div className="flex items-center justify-between text-[11px] font-bold">
+          <span className="text-slate-300 uppercase tracking-wider">Chagua Mtandao:</span>
+          <span className="text-amber-350 text-[10px] font-semibold">
+            {txType === 'deposit' && (
+              <span className="text-blue-400">📱 Inatumika Laini ya Wakala Kawaida</span>
+            )}
+            {txType === 'withdrawal' && withdrawalMethod === 'lipa_namba' && (
+              <span className="text-emerald-400">🏷️ Inatumika Laini ya Lipa Namba</span>
+            )}
+            {txType === 'withdrawal' && withdrawalMethod === 'agent_kawaida' && (
+              <span className="text-blue-400">📱 Inatumika Laini ya Wakala Kawaida</span>
+            )}
+          </span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {PROVIDERS.map(p => (
             <button
               key={p.id}
@@ -368,15 +914,13 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete }) 
             </div>
           </div>
 
-          {/* Estimated Earnings / Commission Banner */}
-          {currentAmountNum > 0 && (
+          {/* Lipa Namba Real Profit Banner - ONLY shown for Lipa Namba since non-lipa commission is unknown */}
+          {isLipaNamba && currentAmountNum > 0 && (
             <div className="p-2.5 bg-emerald-950/40 border border-emerald-500/30 rounded-xl flex items-center justify-between text-xs">
               <span className="text-emerald-300 font-medium">
-                {txType === 'withdrawal' && withdrawalMethod === 'lipa_namba'
-                  ? 'Faida ya Wakala (Ada Uliyochukua):'
-                  : 'Tume Inayokadiriwa:'}
+                Faida ya Wakala (Ada ya Lipa Namba):
               </span>
-              <span className="font-extrabold text-emerald-400 text-sm">+{formatCurrency(calculatedCommission)}</span>
+              <span className="font-extrabold text-emerald-400 text-sm">+{formatCurrency(actualWakalaFee)}</span>
             </div>
           )}
         </div>

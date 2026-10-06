@@ -2,7 +2,6 @@ import React from 'react';
 import { 
   ShoppingCart, 
   Package, 
-  Wrench, 
   History, 
   PlusCircle, 
   Kanban, 
@@ -12,7 +11,9 @@ import {
   ListOrdered,
   LayoutDashboard,
   BarChart3,
-  Database
+  Database,
+  ShieldCheck,
+  TrendingUp
 } from 'lucide-react';
 import type { BranchType } from '../types';
 
@@ -37,14 +38,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         return [
           { id: 'pos', label: 'Mauzo (POS)', icon: ShoppingCart, badge: cartCount > 0 ? cartCount : undefined },
           { id: 'inventory', label: 'Stoo & Vifaa', icon: Package },
-          { id: 'repairs', label: 'Matengenezo', icon: Wrench },
           { id: 'history', label: 'Historia', icon: History },
         ];
       case 'laundry':
         return [
-          { id: 'new_order', label: 'Pokea Nguo', icon: PlusCircle },
-          { id: 'pipeline', label: 'Hatua (Kanban)', icon: Kanban, badge: readyLaundryCount > 0 ? readyLaundryCount : undefined },
-          { id: 'orders_list', label: 'Orodha ya Wateja', icon: Users },
+          { id: 'new_order', label: 'Rekodi Mapato', icon: PlusCircle },
+          { id: 'orders_list', label: 'Historia ya Mapato', icon: ListOrdered },
         ];
       case 'wakala':
         return [
@@ -54,9 +53,17 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         ];
       case 'boss':
         return [
-          { id: 'overview', label: 'Matawi Yote', icon: LayoutDashboard },
-          { id: 'comparison', label: 'Uchambuzi', icon: BarChart3 },
-          { id: 'data_backup', label: 'Backup & Cloud', icon: Database },
+          { id: 'overview', label: 'Matawi', icon: LayoutDashboard },
+          { id: 'reports', label: 'Ripoti & Faida', icon: BarChart3 },
+          { id: 'inventory', label: 'Stoo & Bei', icon: Package },
+        ];
+      case 'admin':
+        return [
+          { id: 'overview', label: 'Matawi', icon: LayoutDashboard },
+          { id: 'reports', label: 'Ripoti & Faida', icon: BarChart3 },
+          { id: 'inventory', label: 'Stoo & Bei', icon: Package },
+          { id: 'security', label: 'PIN & Usalama', icon: ShieldCheck },
+          { id: 'data_backup', label: 'Backup & Mfumo', icon: Database },
         ];
     }
   };
@@ -65,7 +72,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-30 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 shadow-2xl safe-area-bottom">
-      <div className="max-w-md mx-auto flex items-center justify-around">
+      <div className="max-w-lg mx-auto flex items-center justify-around">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -73,19 +80,27 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             <button
               key={item.id}
               onClick={() => onTabChange(item.id)}
-              className={`relative flex flex-col items-center justify-center py-1.5 px-3 rounded-2xl transition-all duration-200 active:scale-90 ${
+              className={`relative flex flex-col items-center justify-center py-1.5 px-2.5 sm:px-3 rounded-2xl transition-all duration-200 active:scale-90 ${
                 isActive
                   ? 'text-white font-bold'
                   : 'text-slate-400 hover:text-slate-200 font-medium'
               }`}
             >
               {isActive && (
-                <span className="absolute -top-1.5 w-8 h-1 bg-gradient-to-r from-blue-500 via-emerald-400 to-indigo-500 rounded-full animate-in fade-in zoom-in" />
+                <span className={`absolute -top-1.5 w-8 h-1 rounded-full animate-in fade-in zoom-in ${
+                  branchType === 'admin' 
+                    ? 'bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-500'
+                    : 'bg-gradient-to-r from-amber-400 via-emerald-400 to-blue-500'
+                }`} />
               )}
               <div className="relative">
                 <div className={`p-1.5 rounded-xl transition-all ${
                   isActive 
-                    ? 'bg-blue-600/25 text-blue-400 scale-110 shadow-lg shadow-blue-500/10' 
+                    ? branchType === 'admin'
+                      ? 'bg-purple-600/25 text-purple-400 scale-110 shadow-lg shadow-purple-500/10'
+                      : branchType === 'boss' 
+                        ? 'bg-amber-500/25 text-amber-400 scale-110 shadow-lg shadow-amber-500/10' 
+                        : 'bg-blue-600/25 text-blue-400 scale-110 shadow-lg shadow-blue-500/10' 
                     : ''
                 }`}>
                   <Icon className="w-5 h-5" />

@@ -38,12 +38,18 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
   const [discount, setDiscount] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const activeBranchId = localStorage.getItem('active_branch_id') || 'branch_phone_1';
+
   // Live query products from Dexie IndexedDB
   const products = useLiveQuery(
     async () => {
-      let collection = db.products.where('branchId').equals('branch_phone');
-      const all = await collection.toArray();
-      return all.filter(p => {
+      const all = await db.products.where('branchId').equals(activeBranchId).toArray();
+      let extra: Product[] = [];
+      if (activeBranchId === 'branch_phone_1') {
+        extra = await db.products.where('branchId').equals('branch_phone').toArray();
+      }
+      const combined = [...all, ...extra];
+      return combined.filter(p => {
         const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory;
         const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               (p.imei && p.imei.includes(searchQuery)) ||
@@ -51,7 +57,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
         return matchesCategory && matchesSearch;
       });
     },
-    [searchQuery, selectedCategory]
+    [searchQuery, selectedCategory, activeBranchId]
   );
 
   const addToCart = (product: Product) => {
@@ -124,7 +130,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
 
       const newSale: Sale = {
         id: saleId,
-        branchId: 'branch_phone',
+        branchId: activeBranchId,
         saleNumber,
         items: saleItems,
         totalAmount: cartSubtotal,
@@ -133,7 +139,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
         paymentMethod,
         customerName: customerName.trim() || undefined,
         customerPhone: customerPhone.trim() || undefined,
-        cashierName: 'Juma Ramadhani',
+        cashierName: 'Muuzaji',
         createdAt: new Date().toISOString(),
         isSynced: false
       };

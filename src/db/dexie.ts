@@ -7,7 +7,8 @@ import type {
   LaundryOrder,
   WakalaTransaction,
   WakalaDayLog,
-  SyncQueueItem
+  SyncQueueItem,
+  Expense
 } from '../types';
 
 export class MadukaDatabase extends Dexie {
@@ -18,6 +19,7 @@ export class MadukaDatabase extends Dexie {
   laundryOrders!: Table<LaundryOrder>;
   wakalaTransactions!: Table<WakalaTransaction>;
   wakalaDayLogs!: Table<WakalaDayLog>;
+  expenses!: Table<Expense>;
   syncQueue!: Table<SyncQueueItem>;
 
   constructor() {
@@ -31,6 +33,9 @@ export class MadukaDatabase extends Dexie {
       wakalaTransactions: 'id, branchId, transactionNumber, provider, type, createdAt, isSynced',
       wakalaDayLogs: 'id, branchId, date, status, isSynced',
       syncQueue: 'id, table, timestamp'
+    });
+    this.version(2).stores({
+      expenses: 'id, branchId, category, createdAt, isSynced'
     });
   }
 }

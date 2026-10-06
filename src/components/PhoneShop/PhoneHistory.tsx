@@ -13,6 +13,7 @@ import {
 import { db, queueSync } from '../../db/dexie';
 import type { Sale } from '../../types';
 import { formatCurrency, formatDate } from '../../services/receiptService';
+import { SHOPS } from '../Auth/PinLogin';
 
 interface PhoneHistoryProps {
   onOpenReceipt: (data: any) => void;
@@ -20,10 +21,11 @@ interface PhoneHistoryProps {
 
 export const PhoneHistory: React.FC<PhoneHistoryProps> = ({ onOpenReceipt }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const activeBranchId = localStorage.getItem('active_branch_id') || 'branch_phone_1';
 
   const sales = useLiveQuery(
     async () => {
-      const all = await db.sales.where('branchId').equals('branch_phone').reverse().sortBy('createdAt');
+      const all = await db.sales.where('branchId').equals(activeBranchId).reverse().sortBy('createdAt');
       return all.filter(s => {
         const matchesSearch = s.saleNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               (s.customerName && s.customerName.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -32,19 +34,20 @@ export const PhoneHistory: React.FC<PhoneHistoryProps> = ({ onOpenReceipt }) => 
         return matchesSearch;
       });
     },
-    [searchQuery]
+    [searchQuery, activeBranchId]
   );
 
   const totalSalesAmount = sales?.reduce((sum, s) => sum + s.finalAmount, 0) || 0;
   const totalSalesCount = sales?.length || 0;
 
   const handleReprint = (sale: Sale) => {
+    const shop = SHOPS.find(s => s.id === sale.branchId || s.id === activeBranchId);
     onOpenReceipt({
       type: 'phone_sale',
       title: 'Risiti ya Mauzo (Sales Receipt)',
-      branchName: 'Duka la Simu & Vifaa',
+      branchName: shop?.name || 'Duka la Simu & Vifaa',
       branchPhone: '+255 712 345 678',
-      branchLocation: 'Mwenge / Mlimani City Branch',
+      branchLocation: shop?.sub || 'Mwanza Branch',
       receiptNumber: sale.saleNumber,
       createdAt: sale.createdAt,
       customerName: sale.customerName,

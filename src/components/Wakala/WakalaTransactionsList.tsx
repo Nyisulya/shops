@@ -103,7 +103,7 @@ export const WakalaTransactionsList: React.FC<WakalaTransactionsListProps> = ({ 
 
         {/* Provider filter buttons */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {['all', 'mpesa', 'tigo', 'airtel', 'halopesa', 'crdb', 'nmb'].map(p => (
+          {['all', 'mpesa', 'tigo', 'airtel', 'halopesa'].map(p => (
             <button
               key={p}
               onClick={() => setProviderFilter(p)}
@@ -159,9 +159,11 @@ export const WakalaTransactionsList: React.FC<WakalaTransactionsListProps> = ({ 
 
               <div className="text-right">
                 <div className="text-sm font-black text-slate-100">{formatCurrency(tx.amount)}</div>
-                <div className="text-[10px] text-emerald-400 font-bold">
-                  {tx.withdrawalMethod === 'lipa_namba' && tx.wakalaFee ? `Ada: +${formatCurrency(tx.wakalaFee)}` : `Tume: +${formatCurrency(tx.commission)}`}
-                </div>
+                {tx.withdrawalMethod === 'lipa_namba' && (tx.wakalaFee || tx.commission) ? (
+                  <div className="text-[10px] text-emerald-400 font-bold">
+                    Ada: +{formatCurrency(tx.wakalaFee || tx.commission)}
+                  </div>
+                ) : null}
               </div>
             </div>
 
