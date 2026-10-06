@@ -288,6 +288,10 @@ export const PinLogin: React.FC<PinLoginProps> = ({
           <h1 className="text-2xl font-black tracking-tight text-white">
             Ingiza Password / PIN
           </h1>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+            <span>Toleo Jipya: v1.2 (Live Update Test)</span>
+          </div>
           <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
             Kila mhudumu ana PIN yake binafsi itakayomfungulia taarifa za duka lake tu moja kwa moja
           </p>

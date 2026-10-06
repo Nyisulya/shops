@@ -104,8 +104,13 @@ export const Header: React.FC<HeaderProps> = ({
             <IconComponent className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <div className={`text-[10px] uppercase font-extrabold tracking-wider ${isAdmin ? 'text-purple-400' : isBoss ? 'text-amber-400' : 'text-slate-400'}`}>
-              {isAdmin ? '⚡ SUPER ADMIN' : isBoss ? '👑 Ofisi ya Boss' : 'Duka Lako'}
+            <div className="flex items-center gap-1.5">
+              <span className={`text-[10px] uppercase font-extrabold tracking-wider ${isAdmin ? 'text-purple-400' : isBoss ? 'text-amber-400' : 'text-slate-400'}`}>
+                {isAdmin ? '⚡ SUPER ADMIN' : isBoss ? '👑 Ofisi ya Boss' : 'Duka Lako'}
+              </span>
+              <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                v1.2
+              </span>
             </div>
             <div className="text-xs sm:text-sm font-bold text-slate-100 truncate max-w-[150px] sm:max-w-[240px]">
               {currentInfo.name}
