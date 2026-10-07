@@ -47,3 +47,74 @@ export const findLipaTariff = (amount: number): LipaTariffTier | null => {
   }
   return null;
 };
+
+export interface LipaFromBalanceResult {
+  totalPhoneBalance: number;
+  amountToSend: number;      // Kiasi mteja anachotuma kwa Lipa Namba
+  lipaCharge: number;        // Makato ya mtandao (Voda/Tigo/etc) kwenye simu ya mteja
+  wakalaTakes: number;       // Ada ya Wakala (Faida ya Wakala)
+  cashToCustomer: number;    // Pesa taslimu (Cash) ya kumpa mteja mkononi
+  tier: LipaTariffTier;
+}
+
+/**
+ * Kokotoa kiotomatiki pale mteja anapokuja na salio lake la simuni (mfano ana 5,000 simuni)
+ * na anataka itoke yote bila simu kukataa kwa sababu ya 'Salio halitoshi'.
+ */
+export const calculateLipaFromPhoneBalance = (
+  totalBalance: number,
+  customFee?: number | ''
+): LipaFromBalanceResult | null => {
+  if (!totalBalance || totalBalance < 521) return null;
+
+  // Kama salio linazidi 3,000,000
+  if (totalBalance > 3000000) {
+    const highestTier = LIPA_TARIFF_TABLE[LIPA_TARIFF_TABLE.length - 1];
+    const send = totalBalance - highestTier.lipaCharge;
+    const fee = (customFee !== undefined && customFee !== '' && !isNaN(Number(customFee)))
+      ? Number(customFee)
+      : highestTier.wakalaTakes;
+    return {
+      totalPhoneBalance: totalBalance,
+      amountToSend: send,
+      lipaCharge: highestTier.lipaCharge,
+      wakalaTakes: fee,
+      cashToCustomer: Math.max(0, send - fee),
+      tier: highestTier
+    };
+  }
+
+  // Tafuta tier kuanzia juu kwenda chini
+  for (let i = LIPA_TARIFF_TABLE.length - 1; i >= 0; i--) {
+    const tier = LIPA_TARIFF_TABLE[i];
+    let possibleSend = totalBalance - tier.lipaCharge;
+
+    if (possibleSend >= tier.minAmount) {
+      if (possibleSend > tier.maxAmount) {
+        possibleSend = tier.maxAmount;
+      }
+
+      if (
+        possibleSend >= tier.minAmount &&
+        possibleSend <= tier.maxAmount &&
+        possibleSend + tier.lipaCharge <= totalBalance
+      ) {
+        const fee = (customFee !== undefined && customFee !== '' && !isNaN(Number(customFee)))
+          ? Number(customFee)
+          : tier.wakalaTakes;
+
+        return {
+          totalPhoneBalance: totalBalance,
+          amountToSend: possibleSend,
+          lipaCharge: tier.lipaCharge,
+          wakalaTakes: fee,
+          cashToCustomer: Math.max(0, possibleSend - fee),
+          tier
+        };
+      }
+    }
+  }
+
+  return null;
+};
+

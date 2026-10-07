@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Search, DollarSign, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
-import { LIPA_TARIFF_TABLE, findLipaTariff } from '../../services/lipaTariffService';
+import { X, Search, DollarSign, ArrowRight, ShieldCheck, Zap, Smartphone, Banknote } from 'lucide-react';
+import { LIPA_TARIFF_TABLE, findLipaTariff, calculateLipaFromPhoneBalance } from '../../services/lipaTariffService';
 import { formatCurrency } from '../../services/receiptService';
 
 interface LipaTariffModalProps {
@@ -15,12 +15,14 @@ export const LipaTariffModal: React.FC<LipaTariffModalProps> = ({
   onSelectAmount
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [calcMode, setCalcMode] = useState<'balance' | 'cash'>('balance');
   const [testAmount, setTestAmount] = useState<number | ''>('');
 
   if (!isOpen) return null;
 
   const testNum = Number(testAmount) || 0;
-  const testTariff = testNum > 0 ? findLipaTariff(testNum) : null;
+  const balanceResult = (calcMode === 'balance' && testNum > 0) ? calculateLipaFromPhoneBalance(testNum) : null;
+  const testTariff = (calcMode === 'cash' && testNum > 0) ? findLipaTariff(testNum) : null;
 
   const filteredTiers = LIPA_TARIFF_TABLE.filter(tier => {
     if (!searchTerm) return true;
@@ -64,10 +66,36 @@ export const LipaTariffModal: React.FC<LipaTariffModalProps> = ({
         </div>
 
         {/* Live Instant Calculator */}
-        <div className="p-3.5 bg-slate-800/60 border-b border-slate-700/60 space-y-2">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1">
-            <Search className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Kikokotoo cha Haraka (Weka Kiasi cha Kutoa):</span>
+        <div className="p-3.5 bg-slate-800/60 border-b border-slate-700/60 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1">
+              <Search className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Kikokotoo cha Haraka:</span>
+            </div>
+
+            {/* Toggle Modes */}
+            <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+              <button
+                type="button"
+                onClick={() => setCalcMode('balance')}
+                className={`px-2 py-0.5 rounded font-bold transition-all flex items-center gap-1 ${
+                  calcMode === 'balance' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Smartphone className="w-3 h-3" />
+                <span>Salio Simuni (5,000)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setCalcMode('cash')}
+                className={`px-2 py-0.5 rounded font-bold transition-all flex items-center gap-1 ${
+                  calcMode === 'cash' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Banknote className="w-3 h-3" />
+                <span>Cash Kamili</span>
+              </button>
+            </div>
           </div>
           
           <div className="flex items-center gap-2">
@@ -75,7 +103,7 @@ export const LipaTariffModal: React.FC<LipaTariffModalProps> = ({
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">TZS</span>
               <input
                 type="number"
-                placeholder="mfano: 10000, 50000, 250000..."
+                placeholder={calcMode === 'balance' ? 'Weka salio la simuni (mfano: 5000)...' : 'Weka cash ya mkononi (mfano: 5000)...'}
                 value={testAmount}
                 onChange={e => setTestAmount(e.target.value === '' ? '' : Number(e.target.value))}
                 className="w-full pl-12 pr-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-sm font-extrabold text-emerald-400 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500"
@@ -95,8 +123,29 @@ export const LipaTariffModal: React.FC<LipaTariffModalProps> = ({
             )}
           </div>
 
-          {testTariff && (
+          {/* Balance Mode Results */}
+          {calcMode === 'balance' && balanceResult && (
             <div className="p-3 bg-emerald-950/50 border border-emerald-500/40 rounded-2xl grid grid-cols-3 gap-2 text-center text-xs animate-in zoom-in-95">
+              <div className="bg-slate-900/80 p-2 rounded-xl border border-emerald-500/30">
+                <div className="text-[10px] text-emerald-400 font-bold uppercase">1. Mwambie Atume</div>
+                <div className="text-sm font-black text-emerald-300">{formatCurrency(balanceResult.amountToSend)}</div>
+              </div>
+              <div className="bg-slate-900/80 p-2 rounded-xl border border-amber-500/30">
+                <div className="text-[10px] text-amber-400 font-bold uppercase">2. Mpe Cash</div>
+                <div className="text-sm font-black text-amber-300">{formatCurrency(balanceResult.cashToCustomer)}</div>
+              </div>
+              <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                <div className="text-[10px] text-slate-400">Ada Yako / Makato</div>
+                <div className="text-xs font-extrabold text-slate-200">
+                  +{formatCurrency(balanceResult.wakalaTakes)} <span className="text-[9px] text-amber-400 font-normal">({formatCurrency(balanceResult.lipaCharge)})</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Cash Mode Results */}
+          {calcMode === 'cash' && testTariff && (
+            <div className="p-3 bg-blue-950/50 border border-blue-500/40 rounded-2xl grid grid-cols-3 gap-2 text-center text-xs animate-in zoom-in-95">
               <div className="bg-slate-900/80 p-2 rounded-xl border border-slate-800">
                 <div className="text-[10px] text-slate-400">Wakala Anachukua</div>
                 <div className="text-sm font-black text-emerald-400">+{formatCurrency(testTariff.wakalaTakes)}</div>

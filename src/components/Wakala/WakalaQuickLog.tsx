@@ -21,12 +21,13 @@ import {
   Save,
   CheckCircle2,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Smartphone
 } from 'lucide-react';
 import { db, generateUniqueId, queueSync } from '../../db/dexie';
 import type { WakalaProvider, WakalaTxType, WakalaTransaction, WakalaWithdrawalMethod, WakalaDayLog } from '../../types';
 import { formatCurrency } from '../../services/receiptService';
-import { findLipaTariff } from '../../services/lipaTariffService';
+import { findLipaTariff, calculateLipaFromPhoneBalance } from '../../services/lipaTariffService';
 import { LipaTariffModal } from './LipaTariffModal';
 import confetti from 'canvas-confetti';
 
@@ -79,6 +80,7 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete, br
   const [openingHalopesaLipaInput, setOpeningHalopesaLipaInput] = useState<number | ''>(100000);
 
   const [floatViewMode, setFloatViewMode] = useState<'all' | 'agent' | 'lipa'>('all');
+  const [isLinesBreakdownOpen, setIsLinesBreakdownOpen] = useState(false);
   const [isEditingMorningBalance, setIsEditingMorningBalance] = useState(false);
   const [morningSavedSuccess, setMorningSavedSuccess] = useState(false);
 
@@ -297,6 +299,9 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete, br
   const [provider, setProvider] = useState<WakalaProvider>('mpesa');
   const [txType, setTxType] = useState<WakalaTxType>('withdrawal');
   const [withdrawalMethod, setWithdrawalMethod] = useState<WakalaWithdrawalMethod>('lipa_namba');
+  // lipaMode: 'balance' = Mteja anatoa salio lililopo simuni (Reverse)
+  //           'cash' = Mteja anataka cash kamili mkononi (Forward)
+  const [lipaMode, setLipaMode] = useState<'balance' | 'cash'>('balance');
   const [amount, setAmount] = useState<number | ''>('');
   const [customWakalaFee, setCustomWakalaFee] = useState<number | ''>('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -305,25 +310,59 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete, br
   const [isTariffModalOpen, setIsTariffModalOpen] = useState(false);
 
   const currentAmountNum = Number(amount) || 0;
-  
-  // Lipa Tariff Lookup
-  const lipaTariff = currentAmountNum > 0 ? findLipaTariff(currentAmountNum) : null;
-  const standardWakalaFee = lipaTariff ? lipaTariff.wakalaTakes : 0;
+  const isLipaNamba = txType === 'withdrawal' && withdrawalMethod === 'lipa_namba';
+
+  // 1. Balance Mode Calculation (Reverse - e.g. Mteja ana 5,000 simuni)
+  const balanceResult = (isLipaNamba && lipaMode === 'balance' && currentAmountNum > 0)
+    ? calculateLipaFromPhoneBalance(currentAmountNum, customWakalaFee !== '' ? Number(customWakalaFee) : undefined)
+    : null;
+
+  // 2. Cash Mode Calculation (Forward - e.g. Mteja anataka 5,000 taslimu)
+  const lipaTariff = (isLipaNamba && lipaMode === 'cash' && currentAmountNum > 0)
+    ? findLipaTariff(currentAmountNum)
+    : null;
+
+  // Standard Wakala Fee
+  const standardWakalaFee = isLipaNamba
+    ? (lipaMode === 'balance' ? (balanceResult?.tier.wakalaTakes || 0) : (lipaTariff?.wakalaTakes || 0))
+    : 0;
+
   const actualWakalaFee = customWakalaFee !== '' ? Number(customWakalaFee) : standardWakalaFee;
 
-  // IMPORTANT: Only Lipa Namba has known upfront profit (Wakala fee).
-  // Non-Lipa transactions (kutoa kawaida na kuweka) do not have speculative guesses.
-  const isLipaNamba = txType === 'withdrawal' && withdrawalMethod === 'lipa_namba';
-  const calculatedCommission = isLipaNamba ? actualWakalaFee : 0;
+  // Figures for Lipa Transaction:
+  // - cashGivenToCustomer: kiasi cha cash kinachotoka drooni na kupewa mteja
+  // - amountSentViaLipa: kiasi mteja anachotuma kwa Lipa Namba (kinaingia Lipa float)
+  // - networkCharge: makato ya mtandao (Vodacom/Tigo nk) kwenye simu ya mteja
+  let cashGivenToCustomer = currentAmountNum;
+  let amountSentViaLipa = currentAmountNum;
+  let networkCharge = 0;
 
-  const totalToPayByCustomer = isLipaNamba
-    ? currentAmountNum + actualWakalaFee
-    : currentAmountNum;
+  if (isLipaNamba) {
+    if (lipaMode === 'balance') {
+      if (balanceResult) {
+        amountSentViaLipa = balanceResult.amountToSend;
+        cashGivenToCustomer = Math.max(0, balanceResult.amountToSend - actualWakalaFee);
+        networkCharge = balanceResult.lipaCharge;
+      }
+    } else {
+      cashGivenToCustomer = currentAmountNum;
+      amountSentViaLipa = currentAmountNum + actualWakalaFee;
+      networkCharge = lipaTariff?.lipaCharge || 0;
+    }
+  }
+
+  const calculatedCommission = isLipaNamba ? actualWakalaFee : 0;
+  const totalToPayByCustomer = isLipaNamba ? amountSentViaLipa : currentAmountNum;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentAmountNum || currentAmountNum <= 0) {
       alert('Tafadhali weka kiasi cha muamala.');
+      return;
+    }
+
+    if (isLipaNamba && lipaMode === 'balance' && !balanceResult) {
+      alert('Salio lililowekwa ni dogo sana kutoa kwa Lipa Namba (angalau TZS 521).');
       return;
     }
 
@@ -340,11 +379,11 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete, br
         provider,
         type: txType,
         withdrawalMethod: txType === 'withdrawal' ? withdrawalMethod : undefined,
-        amount: currentAmountNum,
-        fee: isLipaNamba ? (lipaTariff?.lipaCharge || 0) : 0,
+        amount: isLipaNamba ? cashGivenToCustomer : currentAmountNum,
+        fee: isLipaNamba ? networkCharge : 0,
         wakalaFee: isLipaNamba ? actualWakalaFee : undefined,
-        lipaCharge: isLipaNamba ? (lipaTariff?.lipaCharge || 0) : undefined,
-        totalCollectedFromCustomer: totalToPayByCustomer,
+        lipaCharge: isLipaNamba ? networkCharge : undefined,
+        totalCollectedFromCustomer: isLipaNamba ? amountSentViaLipa : currentAmountNum,
         commission: calculatedCommission,
         customerPhone: customerPhone.trim() || undefined,
         receiptNumber: receiptNumber.trim() || undefined,
@@ -441,93 +480,126 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete, br
               </div>
             </div>
 
-            {/* View Mode Filter Tabs */}
-            <div className="flex items-center justify-between gap-1 pt-1">
-              <span className="text-[10px] font-bold text-slate-400">Angalia Salio la Laini:</span>
-              <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px]">
-                <button
-                  type="button"
-                  onClick={() => setFloatViewMode('all')}
-                  className={`px-2 py-0.5 rounded font-bold transition-all ${
-                    floatViewMode === 'all' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  Laini Zote (8)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFloatViewMode('agent')}
-                  className={`px-2 py-0.5 rounded font-bold transition-all ${
-                    floatViewMode === 'agent' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  📱 Wakala (4)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFloatViewMode('lipa')}
-                  className={`px-2 py-0.5 rounded font-bold transition-all ${
-                    floatViewMode === 'lipa' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  🏷️ Lipa Namba (4)
-                </button>
-              </div>
+            {/* Dropdown Toggle Bar for Line Details */}
+            <div className="pt-1.5 border-t border-slate-800/80">
+              <button
+                type="button"
+                onClick={() => setIsLinesBreakdownOpen(prev => !prev)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-slate-950/70 hover:bg-slate-950 rounded-xl border border-slate-800 hover:border-slate-700 text-xs font-bold transition-all group active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-2">
+                  <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-slate-200 text-[11px] sm:text-xs">
+                    Mchanganuo wa Laini Zote 8 (Voda, Tigo, Airtel, Halo)
+                  </span>
+                  <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full font-semibold hidden xs:inline-block">
+                    {isLinesBreakdownOpen ? 'Wazi' : 'Imefungwa'}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 text-amber-400 text-[11px] font-bold group-hover:text-amber-300">
+                  <span>{isLinesBreakdownOpen ? 'Funga Mchanganuo' : 'Fungua Laini (8)'}</span>
+                  {isLinesBreakdownOpen ? (
+                    <ChevronUp className="w-4 h-4 text-amber-400 transition-transform" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4 text-amber-400 transition-transform" />
+                  )}
+                </div>
+              </button>
             </div>
 
-            {/* Individual Network Floats Breakdown - 4 Agent Lines */}
-            {(floatViewMode === 'all' || floatViewMode === 'agent') && (
-              <div className="space-y-1">
-                <div className="text-[9px] font-extrabold uppercase text-blue-400 tracking-wider flex items-center gap-1">
-                  <span>📱 Laini 4 za Wakala Kawaida (Kumuwekea Mteja)</span>
-                  <span className="text-slate-400 font-normal">| Jumla: {formatCurrency(liveBalances.totalAgentFloat)}</span>
+            {/* Collapsible Line Breakdown Content - Defaults to closed */}
+            {isLinesBreakdownOpen && (
+              <div className="space-y-2 pt-1 border-t border-slate-800/60 animate-in fade-in slide-in-from-top-1 duration-200">
+                {/* View Mode Filter Tabs */}
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-bold text-slate-400">Chuja Laini:</span>
+                  <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+                    <button
+                      type="button"
+                      onClick={() => setFloatViewMode('all')}
+                      className={`px-2 py-0.5 rounded font-bold transition-all ${
+                        floatViewMode === 'all' ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      Laini Zote (8)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFloatViewMode('agent')}
+                      className={`px-2 py-0.5 rounded font-bold transition-all ${
+                        floatViewMode === 'agent' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      📱 Wakala (4)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFloatViewMode('lipa')}
+                      className={`px-2 py-0.5 rounded font-bold transition-all ${
+                        floatViewMode === 'lipa' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      🏷️ Lipa Namba (4)
+                    </button>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
-                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-red-500/20 flex justify-between items-center">
-                    <span className="text-red-400 font-bold truncate">Voda Wakala:</span>
-                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentMpesaAgent)}</span>
-                  </div>
-                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-blue-500/20 flex justify-between items-center">
-                    <span className="text-blue-400 font-bold truncate">Tigo Wakala:</span>
-                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentTigoAgent)}</span>
-                  </div>
-                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-rose-500/20 flex justify-between items-center">
-                    <span className="text-rose-400 font-bold truncate">Airtel Wakala:</span>
-                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentAirtelAgent)}</span>
-                  </div>
-                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-amber-500/20 flex justify-between items-center">
-                    <span className="text-amber-400 font-bold truncate">Halotel Wakala:</span>
-                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentHalopesaAgent)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {/* Individual Network Floats Breakdown - 4 Lipa Lines */}
-            {(floatViewMode === 'all' || floatViewMode === 'lipa') && (
-              <div className="space-y-1 pt-1">
-                <div className="text-[9px] font-extrabold uppercase text-emerald-400 tracking-wider flex items-center gap-1">
-                  <span>🏷️ Laini 4 za Lipa Namba (Kupokea Mteja Anayetoa Lipa)</span>
-                  <span className="text-slate-400 font-normal">| Jumla: {formatCurrency(liveBalances.totalLipaFloat)}</span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
-                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-red-500/20 flex justify-between items-center">
-                    <span className="text-red-400 font-bold truncate">Voda Lipa:</span>
-                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentMpesaLipa)}</span>
+                {/* Individual Network Floats Breakdown - 4 Agent Lines */}
+                {(floatViewMode === 'all' || floatViewMode === 'agent') && (
+                  <div className="space-y-1">
+                    <div className="text-[9px] font-extrabold uppercase text-blue-400 tracking-wider flex items-center gap-1">
+                      <span>📱 Laini 4 za Wakala Kawaida (Kumuwekea Mteja)</span>
+                      <span className="text-slate-400 font-normal">| Jumla: {formatCurrency(liveBalances.totalAgentFloat)}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
+                      <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-red-500/20 flex justify-between items-center">
+                        <span className="text-red-400 font-bold truncate">Voda Wakala:</span>
+                        <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentMpesaAgent)}</span>
+                      </div>
+                      <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-blue-500/20 flex justify-between items-center">
+                        <span className="text-blue-400 font-bold truncate">Tigo Wakala:</span>
+                        <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentTigoAgent)}</span>
+                      </div>
+                      <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-rose-500/20 flex justify-between items-center">
+                        <span className="text-rose-400 font-bold truncate">Airtel Wakala:</span>
+                        <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentAirtelAgent)}</span>
+                      </div>
+                      <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-amber-500/20 flex justify-between items-center">
+                        <span className="text-amber-400 font-bold truncate">Halotel Wakala:</span>
+                        <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentHalopesaAgent)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-blue-500/20 flex justify-between items-center">
-                    <span className="text-blue-400 font-bold truncate">Tigo Lipa:</span>
-                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentTigoLipa)}</span>
+                )}
+
+                {/* Individual Network Floats Breakdown - 4 Lipa Lines */}
+                {(floatViewMode === 'all' || floatViewMode === 'lipa') && (
+                  <div className="space-y-1 pt-1">
+                    <div className="text-[9px] font-extrabold uppercase text-emerald-400 tracking-wider flex items-center gap-1">
+                      <span>🏷️ Laini 4 za Lipa Namba (Kupokea Mteja Anayetoa Lipa)</span>
+                      <span className="text-slate-400 font-normal">| Jumla: {formatCurrency(liveBalances.totalLipaFloat)}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px]">
+                      <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-red-500/20 flex justify-between items-center">
+                        <span className="text-red-400 font-bold truncate">Voda Lipa:</span>
+                        <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentMpesaLipa)}</span>
+                      </div>
+                      <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-blue-500/20 flex justify-between items-center">
+                        <span className="text-blue-400 font-bold truncate">Tigo Lipa:</span>
+                        <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentTigoLipa)}</span>
+                      </div>
+                      <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-rose-500/20 flex justify-between items-center">
+                        <span className="text-rose-400 font-bold truncate">Airtel Lipa:</span>
+                        <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentAirtelLipa)}</span>
+                      </div>
+                      <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-amber-500/20 flex justify-between items-center">
+                        <span className="text-amber-400 font-bold truncate">Halotel Lipa:</span>
+                        <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentHalopesaLipa)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-rose-500/20 flex justify-between items-center">
-                    <span className="text-rose-400 font-bold truncate">Airtel Lipa:</span>
-                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentAirtelLipa)}</span>
-                  </div>
-                  <div className="bg-slate-950/70 px-2 py-1.5 rounded-lg border border-amber-500/20 flex justify-between items-center">
-                    <span className="text-amber-400 font-bold truncate">Halotel Lipa:</span>
-                    <span className="font-extrabold text-slate-200">{formatCurrency(liveBalances.currentHalopesaLipa)}</span>
-                  </div>
-                </div>
+                )}
               </div>
             )}
           </div>
@@ -797,13 +869,65 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete, br
       {/* Amount Input & Preset Buttons */}
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="p-4 bg-slate-800/90 border border-slate-700/80 rounded-2xl space-y-3 shadow-md">
+          {/* Sub-mode selector for Lipa Namba (Reverse vs Forward) */}
+          {txType === 'withdrawal' && withdrawalMethod === 'lipa_namba' && (
+            <div className="bg-slate-900/95 p-2 rounded-2xl border border-emerald-500/30 space-y-1.5">
+              <div className="text-[10px] font-extrabold uppercase text-slate-400 px-1 flex items-center justify-between">
+                <span>Chagua Mtindo wa Kutoa:</span>
+                <span className="text-emerald-400 font-bold text-[10px]">
+                  {lipaMode === 'balance' ? '📱 Mteja Anatoa Salio la Simuni' : '💵 Mteja Anataka Cash Mkononi'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLipaMode('balance');
+                    setCustomWakalaFee('');
+                  }}
+                  className={`py-2 px-2.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-all ${
+                    lipaMode === 'balance'
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-950/50 border border-emerald-400 ring-2 ring-emerald-400/40'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60'
+                  }`}
+                >
+                  <Smartphone className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Salio la Simuni (Reverse)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLipaMode('cash');
+                    setCustomWakalaFee('');
+                  }}
+                  className={`py-2 px-2.5 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-all ${
+                    lipaMode === 'cash'
+                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-950/50 border border-blue-400 ring-2 ring-blue-400/40'
+                      : 'bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60'
+                  }`}
+                >
+                  <Banknote className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Cash Kamili Mkononi</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-bold text-slate-200 mb-1.5">
-              {txType === 'withdrawal' && withdrawalMethod === 'lipa_namba'
-                ? 'Kiasi Anachotaka Mteja Mkononi (TZS) *:'
-                : 'Kiasi cha Muamala (TZS) *:'
-              }
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-slate-200">
+                {txType === 'withdrawal' && withdrawalMethod === 'lipa_namba'
+                  ? (lipaMode === 'balance' ? 'Salio Lililopo Kwenye Simu ya Mteja (TZS) *:' : 'Kiasi Anachotaka Mteja Mkononi (TZS) *:')
+                  : 'Kiasi cha Muamala (TZS) *:'
+                }
+              </label>
+              {txType === 'withdrawal' && withdrawalMethod === 'lipa_namba' && (
+                <span className="text-[10px] text-amber-400 font-semibold">
+                  {lipaMode === 'balance' ? 'Mfano: Mteja ana 5,000 simuni' : 'Mfano: Mteja anataka 5,000 taslimu'}
+                </span>
+              )}
+            </div>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">TZS</span>
               <input
@@ -811,7 +935,7 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete, br
                 required
                 min="500"
                 step="500"
-                placeholder="0"
+                placeholder={txType === 'withdrawal' && withdrawalMethod === 'lipa_namba' && lipaMode === 'balance' ? '5000' : '0'}
                 value={amount}
                 onChange={e => {
                   setAmount(e.target.value === '' ? '' : Number(e.target.value));
@@ -843,24 +967,111 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete, br
             ))}
           </div>
 
-          {/* Lipa Breakdown Details Card */}
-          {txType === 'withdrawal' && withdrawalMethod === 'lipa_namba' && currentAmountNum > 0 && (
-            <div className="p-3.5 bg-gradient-to-br from-slate-950 to-slate-900 border border-emerald-500/40 rounded-2xl space-y-2.5">
+          {/* Lipa Breakdown Details Card - Balance Mode (Reverse) */}
+          {txType === 'withdrawal' && withdrawalMethod === 'lipa_namba' && currentAmountNum > 0 && lipaMode === 'balance' && (
+            <div className="p-3.5 bg-gradient-to-br from-emerald-950/70 via-slate-900 to-slate-950 border-2 border-emerald-500/50 rounded-2xl space-y-3 shadow-xl animate-in zoom-in-95">
               <div className="text-[11px] font-bold text-emerald-300 uppercase tracking-wider flex items-center justify-between">
-                <span>Mchanganuo Halisi wa Lipa Namba:</span>
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  Mwongozo wa Muamala (Salio: {formatCurrency(currentAmountNum)}):
+                </span>
+                <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold">
+                  {balanceResult ? `Kiwango: ${balanceResult.tier.rangeLabel}` : 'Chini ya Kiwango'}
+                </span>
+              </div>
+
+              {balanceResult ? (
+                <>
+                  {/* Big Action Highlights */}
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="bg-slate-900/90 p-2.5 rounded-xl border border-emerald-500/40 shadow-inner">
+                      <div className="text-[10px] text-emerald-400 font-extrabold uppercase">1. Mwambie Atume Lipa:</div>
+                      <div className="text-base sm:text-lg font-black text-emerald-300 mt-0.5">
+                        {formatCurrency(balanceResult.amountToSend)}
+                      </div>
+                      <div className="text-[9px] text-slate-400 mt-0.5">Itaingia float ya Lipa</div>
+                    </div>
+
+                    <div className="bg-slate-900/90 p-2.5 rounded-xl border border-amber-500/40 shadow-inner">
+                      <div className="text-[10px] text-amber-400 font-extrabold uppercase">2. Mpe Cash Mkononi:</div>
+                      <div className="text-base sm:text-lg font-black text-amber-300 mt-0.5">
+                        {formatCurrency(cashGivenToCustomer)}
+                      </div>
+                      <div className="text-[9px] text-slate-400 mt-0.5">Itatoka cash drooni</div>
+                    </div>
+                  </div>
+
+                  {/* Calculations Details */}
+                  <div className="space-y-1.5 text-xs pt-1 border-t border-slate-800">
+                    <div className="flex justify-between items-center text-slate-200">
+                      <span className="font-semibold text-emerald-400">Faida / Ada Yako (Wakala):</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-400">TZS</span>
+                        <input
+                          type="number"
+                          placeholder={standardWakalaFee.toString()}
+                          value={customWakalaFee !== '' ? customWakalaFee : standardWakalaFee}
+                          onChange={e => setCustomWakalaFee(e.target.value === '' ? '' : Number(e.target.value))}
+                          className="w-20 px-2 py-0.5 bg-slate-900 border border-emerald-500/60 rounded-lg text-xs font-black text-right text-emerald-300 focus:outline-none focus:border-emerald-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-400 text-[11px]">
+                      <span>Makato ya Mtandao (Simuni mwake):</span>
+                      <span className="font-mono text-amber-400 font-bold">{formatCurrency(networkCharge)}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-1.5 border-t border-slate-800/80 text-xs">
+                      <span className="font-bold text-slate-300">Jumla Inayokatwa Simuni kwa Mteja:</span>
+                      <span className="font-black text-white">
+                        {formatCurrency(amountSentViaLipa + networkCharge)}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 text-center font-bold">
+                  Salio la TZS {formatCurrency(currentAmountNum)} ni dogo mno kutoa Lipa (kiwango cha chini ni TZS 521).
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Lipa Breakdown Details Card - Cash Mode (Forward) */}
+          {txType === 'withdrawal' && withdrawalMethod === 'lipa_namba' && currentAmountNum > 0 && lipaMode === 'cash' && (
+            <div className="p-3.5 bg-gradient-to-br from-blue-950/70 via-slate-900 to-slate-950 border-2 border-blue-500/50 rounded-2xl space-y-3 shadow-xl animate-in zoom-in-95">
+              <div className="text-[11px] font-bold text-blue-300 uppercase tracking-wider flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Banknote className="w-4 h-4 text-blue-400" />
+                  Mchanganuo wa Cash Mkononi ({formatCurrency(currentAmountNum)}):
+                </span>
                 <span className="text-[10px] text-slate-400">Kiwango: {lipaTariff?.rangeLabel || '500+'}</span>
               </div>
 
-              <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between items-center text-slate-300">
-                  <span>Kiasi cha kumpa mteja:</span>
-                  <span className="font-bold text-slate-100">{formatCurrency(currentAmountNum)}</span>
+              {/* Big Action Highlights */}
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="bg-slate-900/90 p-2.5 rounded-xl border border-emerald-500/40 shadow-inner">
+                  <div className="text-[10px] text-emerald-400 font-extrabold uppercase">1. Mwambie Atume Lipa:</div>
+                  <div className="text-base sm:text-lg font-black text-emerald-300 mt-0.5">
+                    {formatCurrency(amountSentViaLipa)}
+                  </div>
+                  <div className="text-[9px] text-slate-400 mt-0.5">Itaingia float ya Lipa</div>
                 </div>
 
-                <div className="flex justify-between items-center text-emerald-400">
-                  <span className="flex items-center gap-1 font-semibold">
-                    <span>Wakala Anachukua (Ada yako):</span>
-                  </span>
+                <div className="bg-slate-900/90 p-2.5 rounded-xl border border-blue-500/40 shadow-inner">
+                  <div className="text-[10px] text-blue-400 font-extrabold uppercase">2. Mpe Cash Mkononi:</div>
+                  <div className="text-base sm:text-lg font-black text-blue-300 mt-0.5">
+                    {formatCurrency(cashGivenToCustomer)}
+                  </div>
+                  <div className="text-[9px] text-slate-400 mt-0.5">Itatoka cash drooni</div>
+                </div>
+              </div>
+
+              {/* Calculations Details */}
+              <div className="space-y-1.5 text-xs pt-1 border-t border-slate-800">
+                <div className="flex justify-between items-center text-slate-200">
+                  <span className="font-semibold text-emerald-400">Faida / Ada Yako (Wakala):</span>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs font-bold text-slate-400">TZS</span>
                     <input
@@ -868,22 +1079,22 @@ export const WakalaQuickLog: React.FC<WakalaQuickLogProps> = ({ onTxComplete, br
                       placeholder={standardWakalaFee.toString()}
                       value={customWakalaFee !== '' ? customWakalaFee : standardWakalaFee}
                       onChange={e => setCustomWakalaFee(e.target.value === '' ? '' : Number(e.target.value))}
-                      className="w-20 px-2 py-0.5 bg-slate-900 border border-emerald-500/50 rounded-lg text-xs font-black text-right text-emerald-300 focus:outline-none focus:border-emerald-400"
+                      className="w-20 px-2 py-0.5 bg-slate-900 border border-blue-500/60 rounded-lg text-xs font-black text-right text-emerald-300 focus:outline-none focus:border-blue-400"
                     />
                   </div>
                 </div>
 
                 {lipaTariff && (
                   <div className="flex justify-between items-center text-slate-400 text-[11px]">
-                    <span>Makato ya Lipa (Mtandao):</span>
-                    <span className="font-mono text-amber-400">{formatCurrency(lipaTariff.lipaCharge)}</span>
+                    <span>Makato ya Mtandao (Simuni mwake):</span>
+                    <span className="font-mono text-amber-400 font-bold">{formatCurrency(networkCharge)}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between items-center pt-2 border-t border-slate-800 text-xs">
-                  <span className="font-extrabold text-white">Mteja Anatuma Lipa Jumla:</span>
-                  <span className="font-black text-base text-emerald-400">
-                    {formatCurrency(totalToPayByCustomer)}
+                <div className="flex justify-between items-center pt-1.5 border-t border-slate-800/80 text-xs">
+                  <span className="font-bold text-slate-300">Simuni Anapaswa Kuwa Na Angalau:</span>
+                  <span className="font-black text-amber-300">
+                    {formatCurrency(amountSentViaLipa + networkCharge)}
                   </span>
                 </div>
               </div>
