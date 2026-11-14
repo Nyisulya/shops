@@ -44,7 +44,10 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
 
   const repairs = useLiveQuery(
     async () => {
-      const all = await db.repairs.where('branchId').equals('branch_phone').reverse().sortBy('createdAt');
+      let all = await db.repairs.where('branchId').equals(activeBranchId).reverse().sortBy('createdAt');
+      if (all.length === 0 && activeBranchId === 'branch_phone_1') {
+        all = await db.repairs.where('branchId').equals('branch_phone').reverse().sortBy('createdAt');
+      }
       return all.filter(r => {
         const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
         const matchesSearch = r.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||

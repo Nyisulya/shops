@@ -11,6 +11,7 @@ import { SyncModal } from './components/SyncModal';
 import { PinLogin } from './components/Auth/PinLogin';
 import { LicenseModal } from './components/Auth/LicenseModal';
 import { checkLicenseStatus, type LicenseInfo } from './services/licenseService';
+import { triggerBackgroundSync } from './services/syncService';
 
 // Phone Shop Components
 import { PhonePOS } from './components/PhoneShop/PhonePOS';
@@ -65,6 +66,29 @@ export const App: React.FC = () => {
     }, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-sync: internet ikirudi au kila baada ya sekunde 45 ukiwa online
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    triggerBackgroundSync();
+
+    const handleOnline = () => {
+      triggerBackgroundSync();
+    };
+    window.addEventListener('online', handleOnline);
+
+    const syncInterval = setInterval(() => {
+      if (navigator.onLine) {
+        triggerBackgroundSync();
+      }
+    }, 45000);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      clearInterval(syncInterval);
+    };
+  }, [isAuthenticated, currentBranchId, currentBranchType]);
 
   // Hardware Back Button (Double Tap to Exit) Handler
   useEffect(() => {
