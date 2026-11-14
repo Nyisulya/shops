@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import initSqlJs from 'sql.js';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getMessaging } from 'firebase-admin/messaging';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -39,8 +41,32 @@ db.run(`
   );
   CREATE INDEX IF NOT EXISTS idx_sync_updated ON sync_records(updated_at);
   CREATE INDEX IF NOT EXISTS idx_sync_table_branch ON sync_records(table_name, branch_id);
+  CREATE TABLE IF NOT EXISTS device_tokens (
+    token TEXT PRIMARY KEY,
+    role TEXT NOT NULL,
+    branch_id TEXT,
+    updated_at TEXT NOT NULL
+  );
 `);
 saveDbToDisk();
+
+// Initialize Firebase Admin SDK for Push Notifications (FCM)
+let fcmEnabled = false;
+const serviceAccountPath = path.resolve(__dirname, process.env.FIREBASE_SERVICE_ACCOUNT || './firebase-service-account.json');
+if (fs.existsSync(serviceAccountPath)) {
+  try {
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    initializeApp({
+      credential: cert(serviceAccount)
+    });
+    fcmEnabled = true;
+    console.log('Firebase FCM Push Notifications: ENABLED');
+  } catch (err) {
+    console.warn('Firebase FCM init error:', err?.message);
+  }
+} else {
+  console.log('Firebase FCM Push Notifications: DISABLED (firebase-service-account.json not found)');
+}
 
 const ALLOWED_TABLES = new Set([
   'branches',
@@ -118,6 +144,153 @@ app.get('/api/sync/events', requireApiKey, (req, res) => {
   });
 });
 
+const sendPushToTokens = async (tokens, title, body, data = {}) => {
+  if (!fcmEnabled || !tokens.length) return;
+  try {
+    const uniqueTokens = [...new Set(tokens.filter(Boolean))];
+    if (!uniqueTokens.length) return;
+
+    const response = await getMessaging().sendEachForMulticast({
+      tokens: uniqueTokens,
+      notification: { title, body },
+      data: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)])),
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: 'maduka_notifications',
+          sound: 'default'
+        }
+      }
+    });
+
+    // Clean up invalid tokens
+    const badTokens = [];
+    response.responses.forEach((resp, idx) => {
+      if (!resp.success) {
+        const code = resp.error?.code || '';
+        if (code.includes('registration-token-not-registered') || code.includes('invalid-registration-token')) {
+          badTokens.push(uniqueTokens[idx]);
+        }
+      }
+    });
+    if (badTokens.length > 0) {
+      for (const t of badTokens) {
+        db.run('DELETE FROM device_tokens WHERE token = ?', [t]);
+      }
+      saveDbToDisk();
+    }
+  } catch (err) {
+    console.warn('FCM send error:', err?.message);
+  }
+};
+
+const formatTzs = (n) => `TZS ${Number(n || 0).toLocaleString('en-US')}`;
+
+const notifyFromPushedRecords = async (newSales, newRepairs, newWakala, newLaundry, updatedProducts) => {
+  if (!fcmEnabled) return;
+
+  const bossRows = queryAll("SELECT token FROM device_tokens WHERE role IN ('boss', 'admin')");
+  const bossTokens = bossRows.map(r => r.token);
+
+  if (bossTokens.length > 0) {
+    if (newSales.length > 0) {
+      const total = newSales.reduce((s, x) => s + Number(x.finalAmount || 0), 0);
+      await sendPushToTokens(
+        bossTokens,
+        'Mauzo Mapya Dukani',
+        newSales.length === 1
+          ? `Mauzo ya ${formatTzs(total)} yamefanyika.`
+          : `Mauzo ${newSales.length} mapya yenye jumla ya ${formatTzs(total)}.`,
+        { type: 'sale' }
+      );
+    }
+
+    if (newRepairs.length > 0) {
+      const r = newRepairs[0];
+      await sendPushToTokens(
+        bossTokens,
+        'Matengenezo Mapya ya Simu',
+        `${r.phoneModel || 'Simu'} - ${r.customerName || 'Mteja'}`,
+        { type: 'repair' }
+      );
+    }
+
+    if (newWakala.length > 0) {
+      const w = newWakala[0];
+      await sendPushToTokens(
+        bossTokens,
+        'Muamala Mpya wa Wakala',
+        `${String(w.provider || '').toUpperCase()} - ${formatTzs(w.amount)}`,
+        { type: 'wakala' }
+      );
+    }
+
+    if (newLaundry.length > 0) {
+      const l = newLaundry[0];
+      await sendPushToTokens(
+        bossTokens,
+        'Oda Mpya ya Laundry',
+        `${l.customerName || 'Mteja'} - ${formatTzs(l.totalAmount)}`,
+        { type: 'laundry' }
+      );
+    }
+  }
+
+  // Notify branch attendants when products/stock are added or updated
+  if (updatedProducts.length > 0) {
+    const byBranch = new Map();
+    for (const p of updatedProducts) {
+      if (!p.branchId) continue;
+      if (!byBranch.has(p.branchId)) byBranch.set(p.branchId, []);
+      byBranch.get(p.branchId).push(p);
+    }
+
+    for (const [branchId, items] of byBranch.entries()) {
+      const staffRows = queryAll(
+        "SELECT token FROM device_tokens WHERE branch_id = ? AND role NOT IN ('boss', 'admin')",
+        [branchId]
+      );
+      const staffTokens = staffRows.map(r => r.token);
+      if (!staffTokens.length) continue;
+
+      const first = items[0];
+      await sendPushToTokens(
+        staffTokens,
+        items.length === 1 ? 'Stoo / Mzigo Umesasishwa' : `Bidhaa ${items.length} Zimesasishwa`,
+        items.length === 1
+          ? `${first.name} (Stoo: ${first.stock})`
+          : `${first.name} na bidhaa nyingine ${items.length - 1} zimewekwa stoo.`,
+        { type: 'product', branchId }
+      );
+    }
+  }
+};
+
+// Register FCM device token
+app.post('/api/push/register', requireApiKey, (req, res) => {
+  try {
+    const { token, role, branchId } = req.body || {};
+    if (!token || !role) {
+      return res.status(400).json({ ok: false, error: 'Token and role are required.' });
+    }
+    const now = new Date().toISOString();
+    db.run(
+      `INSERT INTO device_tokens (token, role, branch_id, updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(token) DO UPDATE SET
+         role = excluded.role,
+         branch_id = excluded.branch_id,
+         updated_at = excluded.updated_at`,
+      [String(token), String(role), branchId ? String(branchId) : null, now]
+    );
+    saveDbToDisk();
+    res.json({ ok: true, fcmEnabled });
+  } catch (err) {
+    console.error('Push register error:', err);
+    res.status(500).json({ ok: false, error: err?.message || 'Server error' });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   const rows = queryAll('SELECT COUNT(*) as total FROM sync_records WHERE deleted = 0');
@@ -137,9 +310,15 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
 
     let savedCount = 0;
     let deletedCount = 0;
+    const newSales = [];
+    const newRepairs = [];
+    const newWakala = [];
+    const newLaundry = [];
+    const updatedProducts = [];
 
     db.run('BEGIN TRANSACTION');
     try {
+      const existsStmt = db.prepare('SELECT 1 FROM sync_records WHERE table_name = ? AND id = ? AND deleted = 0');
       const upsertStmt = db.prepare(`
         INSERT INTO sync_records (table_name, id, branch_id, data, updated_at, deleted)
         VALUES (?, ?, ?, ?, ?, 0)
@@ -160,6 +339,10 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
 
       for (const rec of records) {
         if (!rec || !ALLOWED_TABLES.has(rec.table) || !rec.id || !rec.data) continue;
+        existsStmt.bind([rec.table, String(rec.id)]);
+        const alreadyExists = existsStmt.step();
+        existsStmt.reset();
+
         const cleanData = { ...rec.data, isSynced: true };
         const branchId = cleanData.branchId || (rec.table === 'branches' ? rec.id : null);
         upsertStmt.run([
@@ -170,6 +353,16 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
           serverTime
         ]);
         savedCount++;
+
+        if (!alreadyExists) {
+          if (rec.table === 'sales') newSales.push(cleanData);
+          else if (rec.table === 'repairs') newRepairs.push(cleanData);
+          else if (rec.table === 'wakalaTransactions') newWakala.push(cleanData);
+          else if (rec.table === 'laundryOrders') newLaundry.push(cleanData);
+        }
+        if (rec.table === 'products') {
+          updatedProducts.push(cleanData);
+        }
       }
 
       for (const del of deletes) {
@@ -178,6 +371,7 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
         deletedCount++;
       }
 
+      existsStmt.free();
       upsertStmt.free();
       deleteStmt.free();
       db.run('COMMIT');
@@ -190,6 +384,7 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
 
     if (savedCount > 0 || deletedCount > 0) {
       broadcastSyncUpdate({ serverTime, savedCount, deletedCount });
+      notifyFromPushedRecords(newSales, newRepairs, newWakala, newLaundry, updatedProducts).catch(() => {});
     }
 
     res.json({

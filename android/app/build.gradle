@@ -4,7 +4,7 @@ android {
     namespace "com.madukatatu.pos"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.madukatatu.pos"
+        applicationId "com.maduka.go"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 6

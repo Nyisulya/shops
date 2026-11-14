@@ -1,0 +1,203 @@
+{
+  "project_info": {
+    "project_number": "331213427661",
+    "firebase_url": "https://vyuo-da8ac-default-rtdb.firebaseio.com",
+    "project_id": "vyuo-da8ac",
+    "storage_bucket": "vyuo-da8ac.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:331213427661:android:53cfa189593e64d9296a84",
+        "android_client_info": {
+          "package_name": "com.example.instagram_clone_flutter"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "331213427661-bkd4b2c4t1t35pucp58dibkhfqv1sjli.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.instagram_clone_flutter",
+            "certificate_hash": "d275e6c1b09ba8b8791aef08b52c3eeae555bb5f"
+          }
+        },
+        {
+          "client_id": "331213427661-vvhkgb8rjmj8lo1mtrjrpf2jtdk4ojrf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.instagram_clone_flutter",
+            "certificate_hash": "ec3c58688dbf7a5a180e7c4be2b3c36fbc952a67"
+          }
+        },
+        {
+          "client_id": "331213427661-pbd9ctn4hgs1j5ndcuoek5hn1pa35veh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_ybET3qfolTnOOXa2DjWudZbuV100NTI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "331213427661-pbd9ctn4hgs1j5ndcuoek5hn1pa35veh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "331213427661-2arj7ja3mjbgv2q4j2tpbnhqnm5eegnd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.schoolvibe.app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:331213427661:android:ec3a7d305eb8f9c4296a84",
+        "android_client_info": {
+          "package_name": "com.maduka.go"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "331213427661-pbd9ctn4hgs1j5ndcuoek5hn1pa35veh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_ybET3qfolTnOOXa2DjWudZbuV100NTI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "331213427661-pbd9ctn4hgs1j5ndcuoek5hn1pa35veh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "331213427661-2arj7ja3mjbgv2q4j2tpbnhqnm5eegnd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.schoolvibe.app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:331213427661:android:29da580caa61a2f1296a84",
+        "android_client_info": {
+          "package_name": "com.schoolvibe.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "331213427661-c8nqrep5do8e27t4idtp5b17u8j0b2eq.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.schoolvibe.app",
+            "certificate_hash": "d275e6c1b09ba8b8791aef08b52c3eeae555bb5f"
+          }
+        },
+        {
+          "client_id": "331213427661-pbd9ctn4hgs1j5ndcuoek5hn1pa35veh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_ybET3qfolTnOOXa2DjWudZbuV100NTI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "331213427661-pbd9ctn4hgs1j5ndcuoek5hn1pa35veh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "331213427661-2arj7ja3mjbgv2q4j2tpbnhqnm5eegnd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.schoolvibe.app"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:331213427661:android:1a6427c4d4d9c719296a84",
+        "android_client_info": {
+          "package_name": "com.schoolvibe.tz"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "331213427661-5h00j4igp4jmjv7761prg1h9111h477d.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.schoolvibe.tz",
+            "certificate_hash": "92c461c974a4d050a3bcc17fb81337ef23f279bf"
+          }
+        },
+        {
+          "client_id": "331213427661-5lotkha5lqq25qeak5qcvlk0359ksqo9.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.schoolvibe.tz",
+            "certificate_hash": "d275e6c1b09ba8b8791aef08b52c3eeae555bb5f"
+          }
+        },
+        {
+          "client_id": "331213427661-6mf2oibhtcomm4fd91oj21n1evseobob.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.schoolvibe.tz",
+            "certificate_hash": "ec3c58688dbf7a5a180e7c4be2b3c36fbc952a67"
+          }
+        },
+        {
+          "client_id": "331213427661-pbd9ctn4hgs1j5ndcuoek5hn1pa35veh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_ybET3qfolTnOOXa2DjWudZbuV100NTI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "331213427661-pbd9ctn4hgs1j5ndcuoek5hn1pa35veh.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "331213427661-2arj7ja3mjbgv2q4j2tpbnhqnm5eegnd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.schoolvibe.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

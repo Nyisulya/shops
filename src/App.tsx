@@ -12,6 +12,7 @@ import { PinLogin } from './components/Auth/PinLogin';
 import { LicenseModal } from './components/Auth/LicenseModal';
 import { checkLicenseStatus, type LicenseInfo } from './services/licenseService';
 import { triggerBackgroundSync, subscribeToRealtimeSync } from './services/syncService';
+import { registerForPushNotifications } from './services/pushService';
 
 // Phone Shop Components
 import { PhonePOS } from './components/PhoneShop/PhonePOS';
@@ -72,6 +73,7 @@ export const App: React.FC = () => {
     if (!isAuthenticated) return;
 
     triggerBackgroundSync();
+    registerForPushNotifications(currentBranchType, currentBranchId);
     const unsubscribeRealtime = subscribeToRealtimeSync();
 
     const handleOnline = () => {
