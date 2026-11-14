@@ -11,9 +11,7 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  Sparkles,
-  HelpCircle,
-  X
+  Sparkles
 } from 'lucide-react';
 import type { BranchType } from '../../types';
 
@@ -204,7 +202,6 @@ export const PinLogin: React.FC<PinLoginProps> = ({
   const [successShop, setSuccessShop] = useState<ShopOption | null>(null);
   const [isShaking, setIsShaking] = useState<boolean>(false);
   const [showPin, setShowPin] = useState<boolean>(false);
-  const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
 
   // Keyboard input listener
   useEffect(() => {
@@ -376,153 +373,20 @@ export const PinLogin: React.FC<PinLoginProps> = ({
             </button>
           </div>
 
-          {/* Toggle show/hide PIN & Help Guide */}
-          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+          {/* Toggle show/hide PIN */}
+          <div className="flex items-center justify-center text-xs text-slate-400 pt-2 border-t border-slate-800">
             <button
               type="button"
               onClick={() => setShowPin(!showPin)}
               className="flex items-center gap-1.5 hover:text-slate-200 transition-colors"
             >
-              {showPin ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5" />}
+              {showPin ? <EyeOff className="w-4 h-4 text-amber-400" /> : <Eye className="w-4 h-4" />}
               <span>{showPin ? 'Ficha PIN' : 'Onyesha Namba'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowHelpModal(true)}
-              className="flex items-center gap-1 text-slate-400 hover:text-amber-400 transition-colors"
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-              <span>Mwongozo wa PIN</span>
             </button>
           </div>
         </div>
 
       </div>
-
-      {/* Help Modal with List of Default PINs */}
-      {showHelpModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700/80 rounded-3xl p-5 max-w-md w-full shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
-                  <KeyRound className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-white">PIN za Kila Duka (Mwongozo)</h3>
-                  <p className="text-[10px] text-slate-400">Kila duka linafunguka tu kwa PIN yake</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowHelpModal(false)}
-                className="p-1 rounded-xl bg-slate-800 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-[10px] uppercase font-bold text-purple-400 tracking-wider">
-                ⚡ Super Admin (Msimamizi Mkuu)
-              </div>
-              <div 
-                onClick={() => { setPin(getShopPin('admin')); validateEnteredPin(getShopPin('admin')); setShowHelpModal(false); }}
-                className="p-2.5 bg-purple-500/10 border border-purple-500/30 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-purple-500/20 transition-all"
-              >
-                <div>
-                  <div className="text-xs font-bold text-purple-300">Super Admin (Wewe)</div>
-                  <div className="text-[10px] text-slate-400">Usimamizi Kamili, PIN za Wote, Backup & Mfumo</div>
-                </div>
-                <div className="px-2.5 py-1 rounded-xl bg-purple-600 text-white font-mono font-black text-xs">
-                  {getShopPin('admin')}
-                </div>
-              </div>
-
-              <div className="text-[10px] uppercase font-bold text-amber-400 tracking-wider pt-2">
-                👑 Ofisi ya Boss (Mmiliki)
-              </div>
-              <div 
-                onClick={() => { setPin(getShopPin('boss')); validateEnteredPin(getShopPin('boss')); setShowHelpModal(false); }}
-                className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-amber-500/20 transition-all"
-              >
-                <div>
-                  <div className="text-xs font-bold text-amber-300">Boss Central Dashboard</div>
-                  <div className="text-[10px] text-slate-400">Matawi, Ripoti & Faida, Stoo (Bila PIN/Backup)</div>
-                </div>
-                <div className="px-2.5 py-1 rounded-xl bg-amber-500 text-slate-950 font-mono font-black text-xs">
-                  {getShopPin('boss')}
-                </div>
-              </div>
-
-              <div className="text-[10px] uppercase font-bold text-blue-400 tracking-wider pt-2">
-                📱 Maduka ya Simu (3)
-              </div>
-              {SHOPS.filter(s => s.type === 'phone').map(shop => (
-                <div 
-                  key={shop.id}
-                  onClick={() => { setPin(getShopPin(shop.id)); validateEnteredPin(getShopPin(shop.id)); setShowHelpModal(false); }}
-                  className="p-2.5 bg-slate-800/80 border border-slate-700/60 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-slate-750 transition-all"
-                >
-                  <div>
-                    <div className="text-xs font-bold text-slate-100">{shop.name}</div>
-                    <div className="text-[10px] text-slate-400">{shop.sub}</div>
-                  </div>
-                  <div className="px-2.5 py-1 rounded-xl bg-blue-600/30 border border-blue-500/40 text-blue-300 font-mono font-black text-xs">
-                    {getShopPin(shop.id)}
-                  </div>
-                </div>
-              ))}
-
-              <div className="text-[10px] uppercase font-bold text-teal-400 tracking-wider pt-2">
-                🧺 GGS Laundry Service (4)
-              </div>
-              {SHOPS.filter(s => s.type === 'laundry').map(shop => (
-                <div 
-                  key={shop.id}
-                  onClick={() => { setPin(getShopPin(shop.id)); validateEnteredPin(getShopPin(shop.id)); setShowHelpModal(false); }}
-                  className="p-2.5 bg-slate-800/80 border border-slate-700/60 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-slate-750 transition-all"
-                >
-                  <div>
-                    <div className="text-xs font-bold text-slate-100">{shop.name}</div>
-                    <div className="text-[10px] text-slate-400">{shop.sub}</div>
-                  </div>
-                  <div className="px-2.5 py-1 rounded-xl bg-teal-600/30 border border-teal-500/40 text-teal-300 font-mono font-black text-xs">
-                    {getShopPin(shop.id)}
-                  </div>
-                </div>
-              ))}
-
-              <div className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider pt-2">
-                💵 M-Pesa & Wakala Kiosk (1)
-              </div>
-              {SHOPS.filter(s => s.type === 'wakala').map(shop => (
-                <div 
-                  key={shop.id}
-                  onClick={() => { setPin(getShopPin(shop.id)); validateEnteredPin(getShopPin(shop.id)); setShowHelpModal(false); }}
-                  className="p-2.5 bg-slate-800/80 border border-slate-700/60 rounded-2xl flex items-center justify-between cursor-pointer hover:bg-slate-750 transition-all"
-                >
-                  <div>
-                    <div className="text-xs font-bold text-slate-100">{shop.name}</div>
-                    <div className="text-[10px] text-slate-400">{shop.sub}</div>
-                  </div>
-                  <div className="px-2.5 py-1 rounded-xl bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 font-mono font-black text-xs">
-                    {getShopPin(shop.id)}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => setShowHelpModal(false)}
-              className="w-full py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all"
-            >
-              Funga Mwongozo
-            </button>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };
