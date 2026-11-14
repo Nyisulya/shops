@@ -708,6 +708,80 @@ app.delete('/api/boss/expenses/:id', requireApiKey, (req, res) => {
   }
 });
 
+app.post('/api/boss/products', requireApiKey, (req, res) => {
+  try {
+    const body = req.body || {};
+    const branchId = String(body.branchId || '').trim();
+    const name = String(body.name || '').trim();
+    const sellingPrice = Number(body.sellingPrice);
+    const costPrice = Number(body.costPrice || 0);
+    const stock = Number(body.stock ?? 0);
+    const minStock = Number(body.minStock ?? 1);
+    const category = ['phone', 'accessory', 'spare', 'other'].includes(body.category) ? body.category : 'phone';
+
+    if (!branchId || !name || Number.isNaN(sellingPrice) || sellingPrice <= 0) {
+      return res.status(400).json({ ok: false, error: 'Jaza tawi, jina la bidhaa, na bei ya kuuza.' });
+    }
+
+    const now = new Date().toISOString();
+    const prodId = body.id ? String(body.id) : `prod_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const productData = {
+      id: prodId,
+      branchId,
+      name,
+      category,
+      imei: body.imei ? String(body.imei).trim() : '',
+      model: body.model ? String(body.model).trim() : '',
+      storage: body.storage ? String(body.storage).trim() : '',
+      condition: body.condition === 'used' ? 'used' : 'new',
+      costPrice: Number.isNaN(costPrice) ? 0 : costPrice,
+      sellingPrice,
+      stock: Number.isNaN(stock) ? 0 : stock,
+      minStock: Number.isNaN(minStock) ? 1 : minStock,
+      updatedAt: now,
+      isSynced: true
+    };
+
+    db.run(
+      `INSERT INTO sync_records (table_name, id, branch_id, data, updated_at, deleted)
+       VALUES ('products', ?, ?, ?, ?, 0)
+       ON CONFLICT(table_name, id) DO UPDATE SET
+         branch_id = excluded.branch_id,
+         data = excluded.data,
+         updated_at = excluded.updated_at,
+         deleted = 0`,
+      [prodId, branchId, JSON.stringify(productData), now]
+    );
+    saveDbToDisk();
+    broadcastSyncUpdate({ serverTime: now, savedCount: 1, deletedCount: 0 });
+    notifyFromPushedRecords([], [], [], [], [productData]).catch(() => {});
+
+    res.json({ ok: true, id: prodId, product: productData });
+  } catch (err) {
+    console.error('Boss save product error:', err);
+    res.status(500).json({ ok: false, error: err?.message || 'Server error' });
+  }
+});
+
+app.delete('/api/boss/products/:id', requireApiKey, (req, res) => {
+  try {
+    const now = new Date().toISOString();
+    db.run(
+      `INSERT INTO sync_records (table_name, id, branch_id, data, updated_at, deleted)
+       VALUES ('products', ?, NULL, '{}', ?, 1)
+       ON CONFLICT(table_name, id) DO UPDATE SET
+         updated_at = excluded.updated_at,
+         deleted = 1`,
+      [req.params.id, now]
+    );
+    saveDbToDisk();
+    broadcastSyncUpdate({ serverTime: now, savedCount: 0, deletedCount: 1 });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err?.message || 'Server error' });
+  }
+});
+
 if (fs.existsSync(distDir)) {
   app.use(express.static(distDir));
   app.get('*', (req, res, next) => {

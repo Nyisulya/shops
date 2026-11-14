@@ -16,7 +16,9 @@ import {
   Smartphone,
   Headphones,
   Wrench,
-  Calendar
+  Calendar,
+  Edit3,
+  X
 } from 'lucide-react';
 import { getSyncConfig } from '../../services/syncService';
 import { formatCurrency, formatDate } from '../../services/receiptService';
@@ -73,6 +75,21 @@ export const BossWebDashboard: React.FC = () => {
   const [expCategory, setExpCategory] = useState('kodi');
   const [expAmount, setExpAmount] = useState('');
   const [expDate, setExpDate] = useState(() => new Date().toISOString().slice(0, 10));
+
+  // Product Add/Edit Modal
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [prodBranch, setProdBranch] = useState('branch_phone_1');
+  const [prodName, setProdName] = useState('');
+  const [prodCategory, setProdCategory] = useState<'phone' | 'accessory' | 'spare' | 'other'>('phone');
+  const [prodCondition, setProdCondition] = useState<'new' | 'used'>('new');
+  const [prodImei, setProdImei] = useState('');
+  const [prodStorage, setProdStorage] = useState('');
+  const [prodCostPrice, setProdCostPrice] = useState('');
+  const [prodSellingPrice, setProdSellingPrice] = useState('');
+  const [prodStock, setProdStock] = useState('1');
+  const [prodMinStock, setProdMinStock] = useState('1');
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
 
   const dateRange = useMemo(() => {
     const now = new Date();
@@ -255,6 +272,81 @@ export const BossWebDashboard: React.FC = () => {
     });
   }, [data, invCat, invSearch]);
 
+  const openNewProductModal = () => {
+    setEditingProductId(null);
+    setProdBranch(selectedBranch !== 'all' ? selectedBranch : 'branch_phone_1');
+    setProdName('');
+    setProdCategory('phone');
+    setProdCondition('new');
+    setProdImei('');
+    setProdStorage('');
+    setProdCostPrice('');
+    setProdSellingPrice('');
+    setProdStock('1');
+    setProdMinStock('1');
+    setIsProductModalOpen(true);
+  };
+
+  const openEditProductModal = (p: any) => {
+    setEditingProductId(p.id);
+    setProdBranch(p.branchId && p.branchId !== 'branch_phone' ? p.branchId : 'branch_phone_1');
+    setProdName(p.name || '');
+    setProdCategory((['phone', 'accessory', 'spare', 'other'].includes(p.category) ? p.category : 'phone') as any);
+    setProdCondition(p.condition === 'used' ? 'used' : 'new');
+    setProdImei(p.imei || '');
+    setProdStorage(p.storage || '');
+    setProdCostPrice(String(p.costPrice ?? ''));
+    setProdSellingPrice(String(p.sellingPrice ?? ''));
+    setProdStock(String(p.stock ?? 0));
+    setProdMinStock(String(p.minStock ?? 1));
+    setIsProductModalOpen(true);
+  };
+
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!prodName.trim() || !prodSellingPrice) return;
+    setIsSavingProduct(true);
+    try {
+      const res = await fetch(`${apiUrl}/boss/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+        body: JSON.stringify({
+          id: editingProductId || undefined,
+          branchId: prodBranch,
+          name: prodName.trim(),
+          category: prodCategory,
+          condition: prodCondition,
+          imei: prodImei.trim(),
+          storage: prodStorage.trim(),
+          costPrice: Number(prodCostPrice || 0),
+          sellingPrice: Number(prodSellingPrice),
+          stock: Number(prodStock || 0),
+          minStock: Number(prodMinStock || 1)
+        })
+      });
+      const json = await res.json();
+      if (!json.ok) {
+        alert(json.error || 'Imeshindwa kuhifadhi bidhaa.');
+        return;
+      }
+      setIsProductModalOpen(false);
+      await fetchOverview();
+    } catch {
+      alert('Hitilafu ya mtandao wakati wa kuhifadhi bidhaa.');
+    } finally {
+      setIsSavingProduct(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string, name: string) => {
+    if (!window.confirm(`Una uhakika unataka kufuta "${name}"?`)) return;
+    await fetch(`${apiUrl}/boss/products/${id}`, {
+      method: 'DELETE',
+      headers: { 'x-api-key': apiKey }
+    });
+    fetchOverview();
+  };
+
   if (!apiKey) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4">
@@ -418,27 +510,36 @@ export const BossWebDashboard: React.FC = () => {
         )}
 
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-2">
-          {[
-            { id: 'overview', label: 'Muhtasari & Faida', icon: TrendingUp },
-            { id: 'inventory', label: 'Stoo & Mtaji', icon: Package },
-            { id: 'salaries', label: 'Mishahara ya Wafanyakazi', icon: Users },
-            { id: 'expenses', label: 'Matumizi & Kodi', icon: Receipt },
-            { id: 'sales', label: 'Mauzo & Ufundi', icon: ShoppingBag }
-          ].map(t => (
-            <button
-              key={t.id}
-              onClick={() => setActiveTab(t.id as any)}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all ${
-                activeTab === t.id
-                  ? 'bg-amber-500 text-slate-950 shadow-lg'
-                  : 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              <t.icon className="w-4 h-4" />
-              <span>{t.label}</span>
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {[
+              { id: 'overview', label: 'Muhtasari & Faida', icon: TrendingUp },
+              { id: 'inventory', label: 'Stoo & Mtaji', icon: Package },
+              { id: 'salaries', label: 'Mishahara ya Wafanyakazi', icon: Users },
+              { id: 'expenses', label: 'Matumizi & Kodi', icon: Receipt },
+              { id: 'sales', label: 'Mauzo & Ufundi', icon: ShoppingBag }
+            ].map(t => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id as any)}
+                className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 transition-all ${
+                  activeTab === t.id
+                    ? 'bg-amber-500 text-slate-950 shadow-lg'
+                    : 'bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <t.icon className="w-4 h-4" />
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={openNewProductModal}
+            className="px-4 py-2.5 rounded-2xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg flex items-center gap-1.5 transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Ongeza Bidhaa</span>
+          </button>
         </div>
 
         {/* TAB 1: OVERVIEW */}
@@ -586,7 +687,8 @@ export const BossWebDashboard: React.FC = () => {
                     <th className="py-2.5 pr-3">Kununua</th>
                     <th className="py-2.5 pr-3">Kuuza</th>
                     <th className="py-2.5 pr-3">Stoo</th>
-                    <th className="py-2.5 text-right">Mtaji</th>
+                    <th className="py-2.5 pr-3 text-right">Mtaji</th>
+                    <th className="py-2.5 text-right">Vitendo</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80">
@@ -604,8 +706,24 @@ export const BossWebDashboard: React.FC = () => {
                           {Number(p.stock) === 0 ? 'Imeisha' : p.stock}
                         </span>
                       </td>
-                      <td className="py-2.5 text-right font-bold text-amber-300">
+                      <td className="py-2.5 pr-3 text-right font-bold text-amber-300">
                         {formatCurrency(Number(p.costPrice || 0) * Number(p.stock || 0))}
+                      </td>
+                      <td className="py-2.5 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => openEditProductModal(p)}
+                          title="Hariri / Ongeza Stoo"
+                          className="p-1.5 rounded-lg text-amber-400 hover:bg-amber-500/15 inline-flex items-center mr-1"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProduct(p.id, p.name)}
+                          title="Futa Bidhaa"
+                          className="p-1.5 rounded-lg text-rose-400 hover:bg-rose-500/15 inline-flex items-center"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -864,6 +982,170 @@ export const BossWebDashboard: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Add / Edit Product Modal */}
+      {isProductModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <form
+            onSubmit={handleSaveProduct}
+            className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-3xl p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-base font-black text-white">
+                {editingProductId ? 'Hariri Bidhaa / Ongeza Stoo' : 'Ongeza Bidhaa Mpya'}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsProductModalOpen(false)}
+                className="p-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Duka / Tawi</label>
+                <select
+                  value={prodBranch}
+                  onChange={e => setProdBranch(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                >
+                  {PHONE_BRANCHES.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Kundi (Category)</label>
+                <select
+                  value={prodCategory}
+                  onChange={e => setProdCategory(e.target.value as any)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                >
+                  <option value="phone">Simu</option>
+                  <option value="accessory">Vifaa (Accessories)</option>
+                  <option value="spare">Spea</option>
+                  <option value="other">Nyingine</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1">Jina la Bidhaa *</label>
+              <input
+                type="text"
+                required
+                placeholder="Mfano: Samsung A15 / Charger Original"
+                value={prodName}
+                onChange={e => setProdName(e.target.value)}
+                className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Hali</label>
+                <select
+                  value={prodCondition}
+                  onChange={e => setProdCondition(e.target.value as any)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                >
+                  <option value="new">Mpya</option>
+                  <option value="used">Mtumba (Used)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Storage (Hiari)</label>
+                <input
+                  type="text"
+                  placeholder="128GB"
+                  value={prodStorage}
+                  onChange={e => setProdStorage(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">IMEI (Hiari)</label>
+                <input
+                  type="text"
+                  placeholder="IMEI..."
+                  value={prodImei}
+                  onChange={e => setProdImei(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Bei ya Kununua / Mtaji (TZS)</label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="250000"
+                  value={prodCostPrice}
+                  onChange={e => setProdCostPrice(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Bei ya Kuuza (TZS) *</label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  placeholder="320000"
+                  value={prodSellingPrice}
+                  onChange={e => setProdSellingPrice(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Idadi / Stoo</label>
+                <input
+                  type="number"
+                  min={0}
+                  required
+                  value={prodStock}
+                  onChange={e => setProdStock(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Tahadhari Stoo Chache</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={prodMinStock}
+                  onChange={e => setProdMinStock(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsProductModalOpen(false)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold"
+              >
+                Ghairi
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingProduct}
+                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black disabled:opacity-60"
+              >
+                {isSavingProduct ? 'Inahifadhi...' : editingProductId ? 'Sasisha Bidhaa' : 'Hifadhi Bidhaa'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 };
