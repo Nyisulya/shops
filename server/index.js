@@ -628,16 +628,18 @@ app.get('/api/boss/overview', requireApiKey, (req, res) => {
       expenses: [
         ...filteredShopExpenses.map(e => ({
           id: e.id,
+          source: 'shop',
           branchId: e.branchId,
           title: e.title,
           category: e.category,
           amount: Number(e.amount || 0),
-          recordedBy: e.recordedBy || '',
+          recordedBy: e.recordedBy || 'Mfanyakazi',
           notes: e.notes || '',
           createdAt: e.createdAt
         })),
         ...filteredBossExpenses.map(e => ({
           id: e.id,
+          source: 'boss',
           branchId: e.branch_id,
           title: e.title,
           category: e.category,

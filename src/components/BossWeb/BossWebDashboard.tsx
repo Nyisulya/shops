@@ -69,6 +69,12 @@ export const BossWebDashboard: React.FC = () => {
   const [salAmount, setSalAmount] = useState('');
   const [salPhone, setSalPhone] = useState('');
 
+  // Boss Expense form (free-text)
+  const [expBranch, setExpBranch] = useState('branch_phone_1');
+  const [expTitle, setExpTitle] = useState('');
+  const [expAmount, setExpAmount] = useState('');
+  const [expDate, setExpDate] = useState(() => new Date().toISOString().slice(0, 10));
+
   // Product Add/Edit Modal
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -188,6 +194,36 @@ export const BossWebDashboard: React.FC = () => {
   const handleDeleteSalary = async (id: string) => {
     if (!confirm('Futa mfanyakazi huyu kwenye orodha ya mishahara?')) return;
     await fetch(`${apiUrl}/boss/salaries/${id}`, {
+      method: 'DELETE',
+      headers: { 'x-api-key': apiKey }
+    });
+    fetchOverview();
+  };
+
+  const handleAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!expTitle.trim() || !expAmount) return;
+    const res = await fetch(`${apiUrl}/boss/expenses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+      body: JSON.stringify({
+        branchId: expBranch,
+        title: expTitle.trim(),
+        category: 'boss',
+        amount: Number(expAmount),
+        expenseDate: expDate
+      })
+    });
+    if (res.ok) {
+      setExpTitle('');
+      setExpAmount('');
+      fetchOverview();
+    }
+  };
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!window.confirm('Futa matumizi haya?')) return;
+    await fetch(`${apiUrl}/boss/expenses/${id}`, {
       method: 'DELETE',
       headers: { 'x-api-key': apiKey }
     });
@@ -480,7 +516,7 @@ export const BossWebDashboard: React.FC = () => {
               { id: 'inventory', label: 'Stoo & Mtaji', icon: Package },
               { id: 'salaries', label: 'Mishahara ya Wafanyakazi', icon: Users },
               { id: 'expenses', label: 'Matumizi & Kodi', icon: Receipt },
-              { id: 'sales', label: 'Mauzo & Ufundi', icon: ShoppingBag }
+              { id: 'sales', label: 'Orodha ya Mauzo', icon: ShoppingBag }
             ].map(t => (
               <button
                 key={t.id}
@@ -518,12 +554,12 @@ export const BossWebDashboard: React.FC = () => {
               </div>
 
               <div className="p-4 rounded-3xl bg-slate-900 border border-blue-500/30 space-y-1">
-                <div className="text-xs font-bold text-blue-400 uppercase">Mauzo + Ufundi</div>
+                <div className="text-xs font-bold text-blue-400 uppercase">Mauzo ya Duka</div>
                 <div className="text-2xl font-black text-white">
-                  {formatCurrency((summary.salesRevenue || 0) + (summary.repairRevenue || 0))}
+                  {formatCurrency(summary.salesRevenue || 0)}
                 </div>
                 <div className="text-xs text-slate-400">
-                  Mauzo: {summary.salesCount || 0} • Ufundi: {summary.repairCount || 0}
+                  Idadi ya Mauzo: {summary.salesCount || 0}
                 </div>
               </div>
 
@@ -799,35 +835,106 @@ export const BossWebDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 4: EXPENSES (READ-ONLY FOR BOSS — RECORDED BY SHOP ATTENDANTS) */}
+        {/* TAB 4: EXPENSES (BOSS CAN RECORD HIS OWN LIKE RENT + VIEW ALL OFFICE EXPENSES) */}
         {activeTab === 'expenses' && (
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <form onSubmit={handleAddExpense} className="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3 h-fit">
+              <h2 className="text-sm font-black text-white flex items-center gap-2">
+                <Plus className="w-4 h-4 text-rose-400" />
+                <span>Andika Matumizi ya Boss</span>
+              </h2>
+              <p className="text-xs text-slate-400">Mfano: Kodi ya fremu, leseni, au gharama yoyote unayolipa mwenyewe.</p>
               <div>
-                <h2 className="text-sm font-black text-white">Matumizi ya Ofisini</h2>
-                <p className="text-xs text-slate-400">Yanarekodiwa na wafanyakazi ofisini kwenye app — hapa unaona muhtasari wake tu.</p>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Duka:</label>
+                <select
+                  value={expBranch}
+                  onChange={e => setExpBranch(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                >
+                  {PHONE_BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
               </div>
-              <span className="text-sm font-black text-rose-400 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-xl">
-                Jumla: {formatCurrency(summary.totalExpenses || 0)}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {(data?.expenses || []).map((e: any) => (
-                <div key={e.id} className="p-3.5 bg-slate-800/70 border border-slate-700/60 rounded-2xl flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold text-white truncate">{e.title}</div>
-                    <div className="text-xs text-slate-400">
-                      {branchLabel(e.branchId || e.branch_id)} • {formatDate(e.createdAt || e.expense_date)} • {e.category}
-                      {e.recordedBy ? ` • Aliyeweka: ${e.recordedBy}` : ''}
-                    </div>
-                    {e.notes && <div className="text-xs text-slate-500 mt-0.5 truncate">{e.notes}</div>}
-                  </div>
-                  <span className="font-black text-sm text-rose-300 shrink-0">-{formatCurrency(e.amount)}</span>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Andika Matumizi *:</label>
+                <input
+                  type="text"
+                  required
+                  value={expTitle}
+                  onChange={e => setExpTitle(e.target.value)}
+                  placeholder="Andika hapa (mfano: Kodi ya Fremu Novemba)"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Tarehe:</label>
+                  <input
+                    type="date"
+                    value={expDate}
+                    onChange={e => setExpDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                  />
                 </div>
-              ))}
-              {(!data?.expenses || data.expenses.length === 0) && (
-                <p className="text-xs text-slate-400 py-8 text-center">Hakuna matumizi yaliyorekodiwa na wafanyakazi kwa kipindi hiki.</p>
-              )}
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Kiasi (TZS) *:</label>
+                  <input
+                    type="number"
+                    required
+                    min={1}
+                    value={expAmount}
+                    onChange={e => setExpAmount(e.target.value)}
+                    placeholder="150000"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="w-full py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm"
+              >
+                Hifadhi Matumizi
+              </button>
+            </form>
+
+            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                <div>
+                  <h2 className="text-sm font-black text-white">Matumizi Yote (Boss & Ofisini)</h2>
+                  <p className="text-xs text-slate-400">Yaliyowekwa na Boss pamoja na yaliyorekodiwa na wafanyakazi ofisini.</p>
+                </div>
+                <span className="text-sm font-black text-rose-400 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-xl">
+                  Jumla: {formatCurrency(summary.totalExpenses || 0)}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {(data?.expenses || []).map((e: any) => (
+                  <div key={e.id} className="p-3.5 bg-slate-800/70 border border-slate-700/60 rounded-2xl flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-bold text-white truncate">{e.title}</div>
+                      <div className="text-xs text-slate-400">
+                        {branchLabel(e.branchId || e.branch_id)} • {formatDate(e.createdAt || e.expense_date)}
+                        {e.recordedBy ? ` • Aliyeweka: ${e.recordedBy}` : ''}
+                      </div>
+                      {e.notes && <div className="text-xs text-slate-500 mt-0.5 truncate">{e.notes}</div>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-black text-sm text-rose-300">-{formatCurrency(e.amount)}</span>
+                      {e.source === 'boss' && (
+                        <button
+                          onClick={() => handleDeleteExpense(e.id)}
+                          title="Futa"
+                          className="p-2 rounded-xl bg-rose-500/15 text-rose-400 hover:bg-rose-500/30"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {(!data?.expenses || data.expenses.length === 0) && (
+                  <p className="text-xs text-slate-400 py-8 text-center">Hakuna matumizi yaliyorekodiwa kwa kipindi hiki.</p>
+                )}
+              </div>
             </div>
           </div>
         )}
