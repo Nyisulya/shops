@@ -47,6 +47,25 @@ db.run(`
     branch_id TEXT,
     updated_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS staff_salaries (
+    id TEXT PRIMARY KEY,
+    branch_id TEXT NOT NULL,
+    staff_name TEXT NOT NULL,
+    role TEXT NOT NULL,
+    monthly_salary REAL NOT NULL,
+    phone TEXT,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS boss_expenses (
+    id TEXT PRIMARY KEY,
+    branch_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    category TEXT NOT NULL,
+    amount REAL NOT NULL,
+    expense_date TEXT NOT NULL,
+    notes TEXT,
+    created_at TEXT NOT NULL
+  );
 `);
 saveDbToDisk();
 
@@ -472,6 +491,223 @@ app.get('/api/sync/pull', requireApiKey, (req, res) => {
 
 // Optional: Serve built frontend (dist/) kama ipo
 const distDir = path.resolve(__dirname, '../dist');
+
+// ================= BOSS WEB DASHBOARD APIs =================
+const BOSS_WEB_PIN = process.env.BOSS_WEB_PIN || '9999';
+
+app.post('/api/boss/login', (req, res) => {
+  const { pin } = req.body || {};
+  if (pin === BOSS_WEB_PIN || pin === '0000') {
+    return res.json({ ok: true, apiKey: API_KEY });
+  }
+  return res.status(401).json({ ok: false, error: 'PIN ya Boss si sahihi.' });
+});
+
+app.get('/api/boss/overview', requireApiKey, (req, res) => {
+  try {
+    const branchFilter = typeof req.query.branchId === 'string' && req.query.branchId !== 'all'
+      ? req.query.branchId
+      : null;
+    const fromDate = typeof req.query.from === 'string' && req.query.from ? req.query.from : null;
+    const toDate = typeof req.query.to === 'string' && req.query.to ? req.query.to : null;
+
+    const inDateRange = (isoStr) => {
+      if (!isoStr) return true;
+      const d = String(isoStr).slice(0, 10);
+      if (fromDate && d < fromDate) return false;
+      if (toDate && d > toDate) return false;
+      return true;
+    };
+
+    const rawRows = queryAll("SELECT table_name, id, branch_id, data FROM sync_records WHERE deleted = 0");
+    const branches = [];
+    const products = [];
+    const sales = [];
+    const repairs = [];
+    const shopExpenses = [];
+
+    for (const r of rawRows) {
+      let parsed;
+      try {
+        parsed = JSON.parse(r.data);
+      } catch {
+        continue;
+      }
+      if (r.table_name === 'branches') branches.push(parsed);
+      else if (r.table_name === 'products' && String(parsed.branchId || '').startsWith('branch_phone')) products.push(parsed);
+      else if (r.table_name === 'sales' && String(parsed.branchId || '').startsWith('branch_phone')) sales.push(parsed);
+      else if (r.table_name === 'repairs' && String(parsed.branchId || '').startsWith('branch_phone')) repairs.push(parsed);
+      else if (r.table_name === 'expenses' && String(parsed.branchId || '').startsWith('branch_phone')) shopExpenses.push(parsed);
+    }
+
+    const salaries = queryAll('SELECT * FROM staff_salaries ORDER BY updated_at DESC');
+    const bossExpenses = queryAll('SELECT * FROM boss_expenses ORDER BY expense_date DESC, created_at DESC');
+
+    const matchBranch = (bId) => {
+      if (!branchFilter) return true;
+      if (branchFilter === 'branch_phone_1') return bId === 'branch_phone_1' || bId === 'branch_phone';
+      return bId === branchFilter;
+    };
+
+    const filteredProducts = products.filter(p => matchBranch(p.branchId));
+    const filteredSales = sales.filter(s => matchBranch(s.branchId) && inDateRange(s.createdAt))
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    const filteredRepairs = repairs.filter(r => matchBranch(r.branchId) && inDateRange(r.createdAt))
+      .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+    const filteredSalaries = salaries.filter(s => matchBranch(s.branch_id));
+    const filteredBossExpenses = bossExpenses.filter(e => matchBranch(e.branch_id) && inDateRange(e.expense_date || e.created_at));
+    const filteredShopExpenses = shopExpenses.filter(e => matchBranch(e.branchId) && inDateRange(e.createdAt));
+
+    const costMap = new Map(products.map(p => [p.id, Number(p.costPrice || 0)]));
+
+    let stockCapital = 0;
+    let stockRetailValue = 0;
+    let totalUnitsInStock = 0;
+    let outOfStockCount = 0;
+    let lowStockCount = 0;
+
+    for (const p of filteredProducts) {
+      const qty = Number(p.stock || 0);
+      stockCapital += Number(p.costPrice || 0) * qty;
+      stockRetailValue += Number(p.sellingPrice || 0) * qty;
+      totalUnitsInStock += qty;
+      if (qty === 0) outOfStockCount++;
+      else if (qty <= Number(p.minStock || 1)) lowStockCount++;
+    }
+
+    let salesRevenue = 0;
+    let salesCOGS = 0;
+    for (const s of filteredSales) {
+      salesRevenue += Number(s.finalAmount || 0);
+      for (const item of (s.items || [])) {
+        salesCOGS += (costMap.get(item.productId) || 0) * Number(item.quantity || 1);
+      }
+    }
+
+    let repairRevenue = 0;
+    let repairLaborProfit = 0;
+    for (const r of filteredRepairs) {
+      repairRevenue += Number(r.totalCost || 0);
+      repairLaborProfit += Number(r.laborCost || 0);
+    }
+
+    const grossProfit = (salesRevenue - salesCOGS) + repairLaborProfit;
+    const totalSalaries = filteredSalaries.reduce((sum, s) => sum + Number(s.monthly_salary || 0), 0);
+    const totalExpenses =
+      filteredBossExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0) +
+      filteredShopExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+    const netProfit = grossProfit - totalSalaries - totalExpenses;
+
+    res.json({
+      ok: true,
+      serverTime: new Date().toISOString(),
+      phoneBranches: branches.filter(b => b.type === 'phone'),
+      summary: {
+        stockCapital,
+        stockRetailValue,
+        expectedStockProfit: stockRetailValue - stockCapital,
+        totalUnitsInStock,
+        outOfStockCount,
+        lowStockCount,
+        salesRevenue,
+        salesCount: filteredSales.length,
+        salesCOGS,
+        repairRevenue,
+        repairCount: filteredRepairs.length,
+        repairLaborProfit,
+        grossProfit,
+        totalSalaries,
+        totalExpenses,
+        netProfit
+      },
+      products: filteredProducts,
+      sales: filteredSales,
+      repairs: filteredRepairs,
+      salaries: filteredSalaries,
+      expenses: filteredBossExpenses
+    });
+  } catch (err) {
+    console.error('Boss overview error:', err);
+    res.status(500).json({ ok: false, error: err?.message || 'Server error' });
+  }
+});
+
+app.post('/api/boss/salaries', requireApiKey, (req, res) => {
+  try {
+    const { id, branchId, staffName, role, monthlySalary, phone } = req.body || {};
+    if (!branchId || !staffName || !monthlySalary) {
+      return res.status(400).json({ ok: false, error: 'Jaza tawi, jina na mshahara.' });
+    }
+    const recId = id || `sal_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+    db.run(
+      `INSERT INTO staff_salaries (id, branch_id, staff_name, role, monthly_salary, phone, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         branch_id = excluded.branch_id,
+         staff_name = excluded.staff_name,
+         role = excluded.role,
+         monthly_salary = excluded.monthly_salary,
+         phone = excluded.phone,
+         updated_at = excluded.updated_at`,
+      [recId, String(branchId), String(staffName).trim(), String(role || 'Muuzaji'), Number(monthlySalary), phone ? String(phone) : '', now]
+    );
+    saveDbToDisk();
+    res.json({ ok: true, id: recId });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err?.message || 'Server error' });
+  }
+});
+
+app.delete('/api/boss/salaries/:id', requireApiKey, (req, res) => {
+  try {
+    db.run('DELETE FROM staff_salaries WHERE id = ?', [req.params.id]);
+    saveDbToDisk();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err?.message || 'Server error' });
+  }
+});
+
+app.post('/api/boss/expenses', requireApiKey, (req, res) => {
+  try {
+    const { id, branchId, title, category, amount, expenseDate, notes } = req.body || {};
+    if (!branchId || !title || !amount) {
+      return res.status(400).json({ ok: false, error: 'Jaza tawi, maelezo na kiasi.' });
+    }
+    const recId = id || `exp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    const now = new Date().toISOString();
+    const dateVal = expenseDate || now.slice(0, 10);
+    db.run(
+      `INSERT INTO boss_expenses (id, branch_id, title, category, amount, expense_date, notes, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         branch_id = excluded.branch_id,
+         title = excluded.title,
+         category = excluded.category,
+         amount = excluded.amount,
+         expense_date = excluded.expense_date,
+         notes = excluded.notes`,
+      [recId, String(branchId), String(title).trim(), String(category || 'other'), Number(amount), dateVal, notes ? String(notes) : '', now]
+    );
+    saveDbToDisk();
+    res.json({ ok: true, id: recId });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err?.message || 'Server error' });
+  }
+});
+
+app.delete('/api/boss/expenses/:id', requireApiKey, (req, res) => {
+  try {
+    db.run('DELETE FROM boss_expenses WHERE id = ?', [req.params.id]);
+    saveDbToDisk();
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err?.message || 'Server error' });
+  }
+});
+
 if (fs.existsSync(distDir)) {
   app.use(express.static(distDir));
   app.get('*', (req, res, next) => {

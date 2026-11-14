@@ -37,8 +37,9 @@ import { BossInventoryControl } from './components/BossDashboard/BossInventoryCo
 import { BossSecurity } from './components/BossDashboard/BossSecurity';
 import { BranchComparison } from './components/BossDashboard/BranchComparison';
 import { DataManagement } from './components/BossDashboard/DataManagement';
+import { BossWebDashboard } from './components/BossWeb/BossWebDashboard';
 
-export const App: React.FC = () => {
+const MainPosApp: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('is_authenticated') === 'true';
   });
@@ -424,6 +425,14 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
+export const App: React.FC = () => {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/boss')) {
+    return <BossWebDashboard />;
+  }
+  return <MainPosApp />;
+};
+
 export default App;
 
 
