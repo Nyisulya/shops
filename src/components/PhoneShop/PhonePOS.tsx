@@ -288,18 +288,41 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
                 )}
               </div>
 
-              {/* Price & Add Indicator */}
-              <div className="flex items-center justify-between pt-1 border-t border-slate-700/50">
-                <span className="font-extrabold text-xs text-blue-400">
+              {/* Price & Add/Remove Controls */}
+              <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-700/50">
+                <span className="font-extrabold text-xs text-blue-400 truncate">
                   {formatCurrency(prod.sellingPrice)}
                 </span>
-                <div className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${
-                  inCart 
-                    ? 'bg-blue-600 text-white font-bold text-xs' 
-                    : 'bg-slate-700/80 text-slate-300 hover:bg-blue-600 hover:text-white'
-                }`}>
-                  {inCart ? inCart.quantity : <Plus className="w-3.5 h-3.5" />}
-                </div>
+                {inCart ? (
+                  <div
+                    className="flex items-center gap-1 shrink-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => updateQuantity(prod.id, -1)}
+                      className="w-6 h-6 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 text-rose-300 border border-rose-500/40 flex items-center justify-center active:scale-95 transition-colors"
+                      aria-label="Punguza idadi"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="min-w-[18px] text-center text-xs font-extrabold text-white">
+                      {inCart.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => updateQuantity(prod.id, 1)}
+                      className="w-6 h-6 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center active:scale-95 transition-colors"
+                      aria-label="Ongeza idadi"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors bg-slate-700/80 text-slate-300 hover:bg-blue-600 hover:text-white shrink-0">
+                    <Plus className="w-3.5 h-3.5" />
+                  </div>
+                )}
               </div>
             </div>
           );
