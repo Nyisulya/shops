@@ -203,19 +203,19 @@ export const PhoneInventory: React.FC = () => {
       {/* Top Inventory Summary Banner */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <div className="bg-slate-800/80 border border-slate-700/60 p-2.5 rounded-2xl">
-          <div className="text-[10px] text-slate-400 font-bold uppercase">Jumla ya Bidhaa</div>
+          <div className="text-xs text-slate-400 font-bold uppercase">Jumla ya Bidhaa</div>
           <div className="text-base font-extrabold text-slate-100">{totalItemsCount} pcs</div>
         </div>
         <div className="bg-slate-800/80 border border-slate-700/60 p-2.5 rounded-2xl">
-          <div className="text-[10px] text-slate-400 font-bold uppercase">Thamani ya Stoo</div>
+          <div className="text-xs text-slate-400 font-bold uppercase">Thamani ya Stoo</div>
           <div className="text-xs font-bold text-blue-400 truncate">{formatCurrency(totalStockValue)}</div>
         </div>
         <div className="bg-slate-800/80 border border-slate-700/60 p-2.5 rounded-2xl">
-          <div className="text-[10px] text-amber-400 font-bold uppercase">Karibu Kuisha</div>
+          <div className="text-xs text-amber-400 font-bold uppercase">Karibu Kuisha</div>
           <div className="text-base font-extrabold text-amber-300">{lowStockCount}</div>
         </div>
         <div className="bg-slate-800/80 border border-slate-700/60 p-2.5 rounded-2xl">
-          <div className="text-[10px] text-rose-400 font-bold uppercase">Zilizoisha (0)</div>
+          <div className="text-xs text-rose-400 font-bold uppercase">Zilizoisha (0)</div>
           <div className="text-base font-extrabold text-rose-400">{outOfStockCount}</div>
         </div>
       </div>
@@ -224,7 +224,7 @@ export const PhoneInventory: React.FC = () => {
       <div className="p-2.5 bg-slate-900/80 border border-slate-800 rounded-2xl flex items-center justify-between text-xs text-slate-400">
         <div className="flex items-center gap-2">
           <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-          <span className="text-[11px]">Usimamizi wa stoo umefungwa kwa usalama (PIN ya Boss inahitajika kuongeza/kufuta).</span>
+          <span className="text-xs">Usimamizi wa stoo umefungwa kwa usalama (PIN ya Boss inahitajika kuongeza/kufuta).</span>
         </div>
       </div>
 
@@ -273,7 +273,7 @@ export const PhoneInventory: React.FC = () => {
 
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-xs text-slate-100 truncate">{prod.name}</div>
-                  <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-slate-400 pt-0.5">
+                  <div className="flex flex-wrap items-center gap-x-2 text-xs text-slate-400 pt-0.5">
                     <span>Bei ya Kuuza: <b className="text-blue-400">{formatCurrency(prod.sellingPrice)}</b></span>
                     <span>Kununua: {formatCurrency(prod.costPrice)}</span>
                   </div>
@@ -397,7 +397,7 @@ export const PhoneInventory: React.FC = () => {
             <form onSubmit={handleSaveProduct} className="p-4 space-y-3 overflow-y-auto flex-1">
               {/* Category */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">Aina ya Bidhaa:</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Aina ya Bidhaa:</label>
                 <div className="grid grid-cols-3 gap-1.5">
                   {[
                     { id: 'phone', label: 'Simu', icon: Smartphone },
@@ -423,7 +423,7 @@ export const PhoneInventory: React.FC = () => {
 
               {/* Name */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">Jina la Bidhaa *:</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Jina la Bidhaa *:</label>
                 <input
                   type="text"
                   required
@@ -439,7 +439,7 @@ export const PhoneInventory: React.FC = () => {
                 <div className="p-3 bg-slate-800/40 rounded-2xl border border-slate-700/50 space-y-2.5">
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-300 mb-1">Model / Aina:</label>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Model / Aina:</label>
                       <input
                         type="text"
                         placeholder="Galaxy A15"
@@ -449,7 +449,7 @@ export const PhoneInventory: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-300 mb-1">Ukubwa (Storage / Uwezo):</label>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Ukubwa (Storage / Uwezo):</label>
                       <select
                         value={storage}
                         onChange={e => setStorage(e.target.value)}
@@ -469,7 +469,7 @@ export const PhoneInventory: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-300 mb-1">Namba ya IMEI (Hiari):</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Namba ya IMEI (Hiari):</label>
                     <input
                       type="text"
                       placeholder="15-digit IMEI namba ya simu hii"
@@ -481,7 +481,7 @@ export const PhoneInventory: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-300 mb-1">Hali:</label>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Hali:</label>
                       <select
                         value={condition}
                         onChange={e => setCondition(e.target.value as any)}
@@ -492,7 +492,7 @@ export const PhoneInventory: React.FC = () => {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-300 mb-1">Warranty (Miezi):</label>
+                      <label className="block text-xs font-bold text-slate-300 mb-1">Warranty (Miezi):</label>
                       <input
                         type="number"
                         placeholder="12"
@@ -508,7 +508,7 @@ export const PhoneInventory: React.FC = () => {
               {/* Pricing & Stock */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Bei ya Kununua (TZS) *:</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Bei ya Kununua (TZS) *:</label>
                   <input
                     type="number"
                     required
@@ -520,7 +520,7 @@ export const PhoneInventory: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Bei ya Kuuza (TZS) *:</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Bei ya Kuuza (TZS) *:</label>
                   <input
                     type="number"
                     required
@@ -535,7 +535,7 @@ export const PhoneInventory: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Idadi ya Stoo (Stock):</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Idadi ya Stoo (Stock):</label>
                   <input
                     type="number"
                     min="0"
@@ -545,7 +545,7 @@ export const PhoneInventory: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Tahadhari ya Kuisha (Min):</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Tahadhari ya Kuisha (Min):</label>
                   <input
                     type="number"
                     min="0"

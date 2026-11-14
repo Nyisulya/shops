@@ -73,11 +73,11 @@ export const PhoneHistory: React.FC<PhoneHistoryProps> = ({ onOpenReceipt }) => 
       {/* Top Banner */}
       <div className="bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-slate-900 border border-blue-800/40 p-3.5 rounded-2xl flex items-center justify-between">
         <div>
-          <div className="text-[10px] text-blue-300 font-bold uppercase">Jumla ya Mauzo Leo</div>
+          <div className="text-xs text-blue-300 font-bold uppercase">Jumla ya Mauzo Leo</div>
           <div className="text-lg font-black text-white">{formatCurrency(totalSalesAmount)}</div>
         </div>
         <div className="text-right">
-          <div className="text-[10px] text-slate-400 font-bold uppercase">Miamala</div>
+          <div className="text-xs text-slate-400 font-bold uppercase">Miamala</div>
           <div className="text-base font-extrabold text-blue-400">{totalSalesCount} risiti</div>
         </div>
       </div>
@@ -105,7 +105,7 @@ export const PhoneHistory: React.FC<PhoneHistoryProps> = ({ onOpenReceipt }) => 
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-extrabold text-xs text-blue-400 font-mono">{sale.saleNumber}</span>
-                  <span className="text-[10px] text-slate-400">{formatDate(sale.createdAt)}</span>
+                  <span className="text-xs text-slate-400">{formatDate(sale.createdAt)}</span>
                 </div>
                 {sale.customerName && (
                   <div className="text-xs text-slate-300 font-medium mt-0.5">
@@ -116,7 +116,7 @@ export const PhoneHistory: React.FC<PhoneHistoryProps> = ({ onOpenReceipt }) => 
 
               <div className="text-right">
                 <div className="text-sm font-black text-slate-100">{formatCurrency(sale.finalAmount)}</div>
-                <div className="text-[10px] uppercase font-bold text-slate-400">
+                <div className="text-xs uppercase font-bold text-slate-400">
                   {sale.paymentMethod}
                 </div>
               </div>
@@ -134,7 +134,7 @@ export const PhoneHistory: React.FC<PhoneHistoryProps> = ({ onOpenReceipt }) => 
 
             {/* Actions */}
             <div className="flex items-center justify-between pt-1 border-t border-slate-700/50">
-              <span className={`text-[10px] px-2 py-0.5 rounded-md ${
+              <span className={`text-xs px-2 py-0.5 rounded-md ${
                 sale.isSynced ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
               }`}>
                 {sale.isSynced ? 'Synced mtandaoni' : 'Inasubiri sync ya jioni'}

@@ -237,7 +237,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-extrabold text-xs text-blue-400 font-mono">{item.repairNumber}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.color}`}>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${badge.color}`}>
                       {badge.label}
                     </span>
                   </div>
@@ -247,9 +247,9 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
                 <div className="text-right">
                   <div className="text-xs font-bold text-slate-100">{formatCurrency(item.totalCost)}</div>
                   {item.balanceDue > 0 ? (
-                    <div className="text-[10px] text-rose-400 font-bold">Baki: {formatCurrency(item.balanceDue)}</div>
+                    <div className="text-xs text-rose-400 font-bold">Baki: {formatCurrency(item.balanceDue)}</div>
                   ) : (
-                    <div className="text-[10px] text-emerald-400 font-bold">Imelipwa Yote</div>
+                    <div className="text-xs text-emerald-400 font-bold">Imelipwa Yote</div>
                   )}
                 </div>
               </div>
@@ -261,7 +261,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
               </div>
 
               {/* Customer & Technician info */}
-              <div className="flex items-center justify-between text-[11px] text-slate-400">
+              <div className="flex items-center justify-between text-xs text-slate-400">
                 <div className="flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-slate-500" />
                   <span>{item.customerName} ({item.customerPhone})</span>
@@ -277,7 +277,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
                   {item.status === 'received' && (
                     <button
                       onClick={() => handleUpdateStatus(item, 'in_progress')}
-                      className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-[11px] font-bold flex items-center gap-1 active:scale-95"
+                      className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95"
                     >
                       <span>Anza Kazi</span>
                       <ArrowRight className="w-3 h-3" />
@@ -286,7 +286,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
                   {item.status === 'in_progress' && (
                     <button
                       onClick={() => handleUpdateStatus(item, 'ready')}
-                      className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-[11px] font-bold flex items-center gap-1 active:scale-95"
+                      className="px-2.5 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95"
                     >
                       <CheckCircle2 className="w-3 h-3" />
                       <span>Weka "Tayari"</span>
@@ -295,7 +295,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
                   {item.status === 'ready' && (
                     <button
                       onClick={() => handleUpdateStatus(item, 'delivered')}
-                      className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 active:scale-95"
+                      className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 active:scale-95"
                     >
                       <CheckCircle2 className="w-3 h-3" />
                       <span>Kabidhi Mteja & Malizia</span>
@@ -365,7 +365,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
               {/* Customer Info */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Jina la Mteja *:</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Jina la Mteja *:</label>
                   <input
                     type="text"
                     required
@@ -376,7 +376,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Simu ya Mteja *:</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Simu ya Mteja *:</label>
                   <input
                     type="tel"
                     required
@@ -391,7 +391,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
               {/* Phone Model & IMEI */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">Aina ya Simu *:</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">Aina ya Simu *:</label>
                   <input
                     type="text"
                     required
@@ -402,7 +402,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-300 mb-1">IMEI / Namba (Hiari):</label>
+                  <label className="block text-xs font-bold text-slate-300 mb-1">IMEI / Namba (Hiari):</label>
                   <input
                     type="text"
                     placeholder="IMEI"
@@ -415,7 +415,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
 
               {/* Issue description */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">Maelezo ya Tatizo *:</label>
+                <label className="block text-xs font-bold text-slate-300 mb-1">Maelezo ya Tatizo *:</label>
                 <textarea
                   required
                   rows={2}
@@ -430,7 +430,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
               <div className="p-3 bg-slate-800/40 rounded-2xl border border-slate-700/50 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-300 mb-1">Gharama ya Spea (TZS):</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Gharama ya Spea (TZS):</label>
                     <input
                       type="number"
                       min="0"
@@ -440,7 +440,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-300 mb-1">Ufundi / Labor (TZS):</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Ufundi / Labor (TZS):</label>
                     <input
                       type="number"
                       min="0"
@@ -453,7 +453,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-300 mb-1">Malipo ya Awali (Deposit):</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Malipo ya Awali (Deposit):</label>
                     <input
                       type="number"
                       min="0"
@@ -463,7 +463,7 @@ export const PhoneRepairs: React.FC<PhoneRepairsProps> = ({ onOpenReceipt }) => 
                     />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-300 mb-1">Jina la Fundi:</label>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Jina la Fundi:</label>
                     <input
                       type="text"
                       value={technician}

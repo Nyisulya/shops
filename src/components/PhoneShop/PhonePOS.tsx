@@ -145,21 +145,33 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
       };
 
       // Atomic transaction: save sale and reduce inventory in Dexie Local DB
+      const updatedProductsToSync: Product[] = [];
       await db.transaction('rw', [db.sales, db.products], async () => {
         await db.sales.put(newSale);
         for (const item of cart) {
           const currentProd = await db.products.get(item.product.id);
           if (currentProd) {
             const newStock = Math.max(0, currentProd.stock - item.quantity);
+            const now = new Date().toISOString();
             await db.products.update(item.product.id, {
               stock: newStock,
-              updatedAt: new Date().toISOString()
+              updatedAt: now,
+              isSynced: false
+            });
+            updatedProductsToSync.push({
+              ...currentProd,
+              stock: newStock,
+              updatedAt: now,
+              isSynced: false
             });
           }
         }
       });
 
-      // Queue for evening sync
+      // Queue sale AND updated product stock for real-time cloud sync
+      for (const updatedProd of updatedProductsToSync) {
+        await queueSync('products', updatedProd.id, 'update', updatedProd);
+      }
       await queueSync('sales', saleId, 'create', newSale);
 
       confetti({
@@ -249,8 +261,8 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
               }`}
             >
               {/* Product Badge */}
-              <div className="flex items-center justify-between gap-1 mb-1.5">
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+              <div className="flex items-center justify-between gap-1 mb-2">
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                   prod.category === 'phone' 
                     ? 'bg-blue-500/20 text-blue-300' 
                     : prod.category === 'accessory' 
@@ -260,67 +272,67 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
                   {prod.category === 'phone' ? 'Simu' : prod.category === 'accessory' ? 'Kifaa' : 'Spea'}
                 </span>
 
-                <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded ${
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
                   isOutOfStock 
                     ? 'bg-rose-500/20 text-rose-400' 
                     : isLowStock 
                     ? 'bg-amber-500/20 text-amber-300' 
-                    : 'text-slate-400'
+                    : 'text-slate-300'
                 }`}>
                   {isOutOfStock ? 'Imeisha' : `${prod.stock} zipo`}
                 </span>
               </div>
 
               {/* Product Details */}
-              <div className="space-y-0.5 mb-2">
-                <h3 className="font-semibold text-xs text-slate-100 line-clamp-2 leading-tight">
+              <div className="space-y-1 mb-2.5">
+                <h3 className="font-bold text-sm text-slate-100 line-clamp-2 leading-snug">
                   {prod.name}
                 </h3>
                 {prod.imei && (
-                  <p className="text-[10px] text-slate-400 font-mono truncate">
+                  <p className="text-xs text-slate-400 font-mono truncate">
                     IMEI: {prod.imei}
                   </p>
                 )}
                 {prod.warrantyMonths && (
-                  <p className="text-[10px] text-emerald-400">
+                  <p className="text-xs text-emerald-400">
                     Warranty miezi {prod.warrantyMonths}
                   </p>
                 )}
               </div>
 
               {/* Price & Add/Remove Controls */}
-              <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-700/50">
-                <span className="font-extrabold text-xs text-blue-400 truncate">
+              <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-slate-700/50">
+                <span className="font-extrabold text-sm text-blue-400 truncate">
                   {formatCurrency(prod.sellingPrice)}
                 </span>
                 {inCart ? (
                   <div
-                    className="flex items-center gap-1 shrink-0"
+                    className="flex items-center gap-1.5 shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
                       type="button"
                       onClick={() => updateQuantity(prod.id, -1)}
-                      className="w-6 h-6 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 text-rose-300 border border-rose-500/40 flex items-center justify-center active:scale-95 transition-colors"
+                      className="w-7 h-7 rounded-lg bg-rose-500/20 hover:bg-rose-500/35 text-rose-300 border border-rose-500/40 flex items-center justify-center active:scale-95 transition-colors"
                       aria-label="Punguza idadi"
                     >
-                      <Minus className="w-3 h-3" />
+                      <Minus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="min-w-[18px] text-center text-xs font-extrabold text-white">
+                    <span className="min-w-[20px] text-center text-sm font-extrabold text-white">
                       {inCart.quantity}
                     </span>
                     <button
                       type="button"
                       onClick={() => updateQuantity(prod.id, 1)}
-                      className="w-6 h-6 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center active:scale-95 transition-colors"
+                      className="w-7 h-7 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center active:scale-95 transition-colors"
                       aria-label="Ongeza idadi"
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 ) : (
-                  <div className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors bg-slate-700/80 text-slate-300 hover:bg-blue-600 hover:text-white shrink-0">
-                    <Plus className="w-3.5 h-3.5" />
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors bg-slate-700/80 text-slate-300 hover:bg-blue-600 hover:text-white shrink-0">
+                    <Plus className="w-4 h-4" />
                   </div>
                 )}
               </div>
@@ -347,7 +359,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
                 {totalItemsCount}
               </div>
               <div className="text-left">
-                <div className="text-[10px] uppercase font-bold text-blue-200 tracking-wider">Kikapu cha Mauzo</div>
+                <div className="text-xs uppercase font-bold text-blue-200 tracking-wider">Kikapu cha Mauzo</div>
                 <div className="text-sm font-extrabold">{formatCurrency(cartFinalTotal)}</div>
               </div>
             </div>
@@ -388,7 +400,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
                   >
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-xs text-slate-200 truncate">{item.product.name}</div>
-                      <div className="text-[10px] text-blue-400">{formatCurrency(item.product.sellingPrice)} kila moja</div>
+                      <div className="text-xs text-blue-400">{formatCurrency(item.product.sellingPrice)} kila moja</div>
                       {item.selectedImei && (
                         <div className="text-[9px] text-slate-400 font-mono">IMEI: {item.selectedImei}</div>
                       )}
@@ -422,7 +434,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
 
               {/* Customer Info (Optional) */}
               <div className="p-3 bg-slate-800/40 border border-slate-700/50 rounded-2xl space-y-2">
-                <div className="text-[11px] font-bold text-slate-300">Taarifa za Mteja (Sio Lazima):</div>
+                <div className="text-xs font-bold text-slate-300">Taarifa za Mteja (Sio Lazima):</div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="relative">
                     <User className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -449,7 +461,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
 
               {/* Payment Method */}
               <div className="space-y-1.5">
-                <div className="text-[11px] font-bold text-slate-300">Njia ya Malipo:</div>
+                <div className="text-xs font-bold text-slate-300">Njia ya Malipo:</div>
                 <div className="grid grid-cols-3 gap-1.5">
                   {[
                     { id: 'cash', label: 'Cash', icon: Banknote },
