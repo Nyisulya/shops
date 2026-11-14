@@ -19,6 +19,7 @@ import { PhonePOS } from './components/PhoneShop/PhonePOS';
 import { PhoneInventory } from './components/PhoneShop/PhoneInventory';
 import { PhoneRepairs } from './components/PhoneShop/PhoneRepairs';
 import { PhoneHistory } from './components/PhoneShop/PhoneHistory';
+import { PhoneExpenses } from './components/PhoneShop/PhoneExpenses';
 
 // Laundry Components
 import { LaundryNewOrder } from './components/Laundry/LaundryNewOrder';
@@ -329,6 +330,7 @@ const MainPosApp: React.FC = () => {
           <>
             {activeTab === 'pos' && <PhonePOS />}
             {activeTab === 'inventory' && <PhoneInventory />}
+            {activeTab === 'expenses' && <PhoneExpenses />}
             {activeTab === 'history' && <PhoneHistory onOpenReceipt={handleGenericOpenReceipt} />}
           </>
         )}

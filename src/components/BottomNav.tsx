@@ -13,7 +13,8 @@ import {
   BarChart3,
   Database,
   ShieldCheck,
-  TrendingUp
+  TrendingUp,
+  Receipt
 } from 'lucide-react';
 import type { BranchType } from '../types';
 
@@ -38,6 +39,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         return [
           { id: 'pos', label: 'Mauzo (POS)', icon: ShoppingCart, badge: cartCount > 0 ? cartCount : undefined },
           { id: 'inventory', label: 'Stoo & Vifaa', icon: Package },
+          { id: 'expenses', label: 'Matumizi', icon: Receipt },
           { id: 'history', label: 'Historia', icon: History },
         ];
       case 'laundry':

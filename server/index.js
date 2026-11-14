@@ -625,7 +625,28 @@ app.get('/api/boss/overview', requireApiKey, (req, res) => {
       sales: filteredSales,
       repairs: filteredRepairs,
       salaries: filteredSalaries,
-      expenses: filteredBossExpenses
+      expenses: [
+        ...filteredShopExpenses.map(e => ({
+          id: e.id,
+          branchId: e.branchId,
+          title: e.title,
+          category: e.category,
+          amount: Number(e.amount || 0),
+          recordedBy: e.recordedBy || '',
+          notes: e.notes || '',
+          createdAt: e.createdAt
+        })),
+        ...filteredBossExpenses.map(e => ({
+          id: e.id,
+          branchId: e.branch_id,
+          title: e.title,
+          category: e.category,
+          amount: Number(e.amount || 0),
+          recordedBy: 'Boss',
+          notes: e.notes || '',
+          createdAt: e.expense_date || e.created_at
+        }))
+      ].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))
     });
   } catch (err) {
     console.error('Boss overview error:', err);

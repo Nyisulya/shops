@@ -69,13 +69,6 @@ export const BossWebDashboard: React.FC = () => {
   const [salAmount, setSalAmount] = useState('');
   const [salPhone, setSalPhone] = useState('');
 
-  // Expense form
-  const [expBranch, setExpBranch] = useState('branch_phone_1');
-  const [expTitle, setExpTitle] = useState('');
-  const [expCategory, setExpCategory] = useState('kodi');
-  const [expAmount, setExpAmount] = useState('');
-  const [expDate, setExpDate] = useState(() => new Date().toISOString().slice(0, 10));
-
   // Product Add/Edit Modal
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -195,36 +188,6 @@ export const BossWebDashboard: React.FC = () => {
   const handleDeleteSalary = async (id: string) => {
     if (!confirm('Futa mfanyakazi huyu kwenye orodha ya mishahara?')) return;
     await fetch(`${apiUrl}/boss/salaries/${id}`, {
-      method: 'DELETE',
-      headers: { 'x-api-key': apiKey }
-    });
-    fetchOverview();
-  };
-
-  const handleAddExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!expTitle.trim() || !expAmount) return;
-    const res = await fetch(`${apiUrl}/boss/expenses`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
-      body: JSON.stringify({
-        branchId: expBranch,
-        title: expTitle.trim(),
-        category: expCategory,
-        amount: Number(expAmount),
-        expenseDate: expDate
-      })
-    });
-    if (res.ok) {
-      setExpTitle('');
-      setExpAmount('');
-      fetchOverview();
-    }
-  };
-
-  const handleDeleteExpense = async (id: string) => {
-    if (!confirm('Futa gharama hii?')) return;
-    await fetch(`${apiUrl}/boss/expenses/${id}`, {
       method: 'DELETE',
       headers: { 'x-api-key': apiKey }
     });
@@ -836,106 +799,35 @@ export const BossWebDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* TAB 4: EXPENSES */}
+        {/* TAB 4: EXPENSES (READ-ONLY FOR BOSS — RECORDED BY SHOP ATTENDANTS) */}
         {activeTab === 'expenses' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <form onSubmit={handleAddExpense} className="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3 h-fit">
-              <h2 className="text-sm font-black text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-rose-400" />
-                <span>Rekodi Gharama / Kodi / LUKU</span>
-              </h2>
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Duka:</label>
-                <select
-                  value={expBranch}
-                  onChange={e => setExpBranch(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white"
-                >
-                  {PHONE_BRANCHES.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
+                <h2 className="text-sm font-black text-white">Matumizi ya Ofisini</h2>
+                <p className="text-xs text-slate-400">Yanarekodiwa na wafanyakazi ofisini kwenye app — hapa unaona muhtasari wake tu.</p>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Maelezo ya Gharama *:</label>
-                <input
-                  type="text"
-                  required
-                  value={expTitle}
-                  onChange={e => setExpTitle(e.target.value)}
-                  placeholder="mfano: Kodi ya Fremu Novemba"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Aina:</label>
-                  <select
-                    value={expCategory}
-                    onChange={e => setExpCategory(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white"
-                  >
-                    <option value="kodi">Kodi ya Pango</option>
-                    <option value="umeme">Umeme (LUKU)</option>
-                    <option value="usafiri">Usafiri / Mzigo</option>
-                    <option value="posho">Posho / Chakula</option>
-                    <option value="other">Mengineyo</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-300 mb-1">Tarehe:</label>
-                  <input
-                    type="date"
-                    value={expDate}
-                    onChange={e => setExpDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Kiasi (TZS) *:</label>
-                <input
-                  type="number"
-                  required
-                  value={expAmount}
-                  onChange={e => setExpAmount(e.target.value)}
-                  placeholder="150000"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-sm"
-              >
-                Hifadhi Gharama
-              </button>
-            </form>
-
-            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-3xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-black text-white">Matumizi Yaliyorekodiwa</h2>
-                <span className="text-sm font-black text-rose-400">Jumla: {formatCurrency(summary.totalExpenses || 0)}</span>
-              </div>
-              <div className="space-y-2">
-                {(data?.expenses || []).map((e: any) => (
-                  <div key={e.id} className="p-3 bg-slate-800/70 border border-slate-700/60 rounded-2xl flex items-center justify-between gap-2">
-                    <div>
-                      <div className="text-sm font-bold text-white">{e.title}</div>
-                      <div className="text-xs text-slate-400">{branchLabel(e.branch_id)} • {e.expense_date} • {e.category}</div>
+              <span className="text-sm font-black text-rose-400 bg-rose-500/10 border border-rose-500/30 px-3 py-1.5 rounded-xl">
+                Jumla: {formatCurrency(summary.totalExpenses || 0)}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {(data?.expenses || []).map((e: any) => (
+                <div key={e.id} className="p-3.5 bg-slate-800/70 border border-slate-700/60 rounded-2xl flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-white truncate">{e.title}</div>
+                    <div className="text-xs text-slate-400">
+                      {branchLabel(e.branchId || e.branch_id)} • {formatDate(e.createdAt || e.expense_date)} • {e.category}
+                      {e.recordedBy ? ` • Aliyeweka: ${e.recordedBy}` : ''}
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-black text-sm text-rose-300">-{formatCurrency(e.amount)}</span>
-                      <button
-                        onClick={() => handleDeleteExpense(e.id)}
-                        className="p-2 rounded-xl bg-rose-500/15 text-rose-400 hover:bg-rose-500/30"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {e.notes && <div className="text-xs text-slate-500 mt-0.5 truncate">{e.notes}</div>}
                   </div>
-                ))}
-                {(!data?.expenses || data.expenses.length === 0) && (
-                  <p className="text-xs text-slate-400 py-8 text-center">Hakuna matumizi yaliyorekodiwa bado.</p>
-                )}
-              </div>
+                  <span className="font-black text-sm text-rose-300 shrink-0">-{formatCurrency(e.amount)}</span>
+                </div>
+              ))}
+              {(!data?.expenses || data.expenses.length === 0) && (
+                <p className="text-xs text-slate-400 py-8 text-center">Hakuna matumizi yaliyorekodiwa na wafanyakazi kwa kipindi hiki.</p>
+              )}
             </div>
           </div>
         )}
