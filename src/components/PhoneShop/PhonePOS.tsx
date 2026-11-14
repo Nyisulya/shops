@@ -238,12 +238,12 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
         </div>
 
         {/* Categories Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex flex-wrap items-center gap-1.5 pb-1">
           {[
             { id: 'all', label: 'Zote' },
-            { id: 'phone', label: 'Simu Pekee', icon: Smartphone },
-            { id: 'accessory', label: 'Vifaa (Accessories)', icon: Headphones },
-            { id: 'spare', label: 'Spea & Matengenezo', icon: Wrench },
+            { id: 'phone', label: 'Simu', icon: Smartphone },
+            { id: 'accessory', label: 'Vifaa', icon: Headphones },
+            { id: 'spare', label: 'Spea', icon: Wrench },
             { id: 'other', label: 'Nyingine', icon: Tag },
           ].map(cat => (
             <button

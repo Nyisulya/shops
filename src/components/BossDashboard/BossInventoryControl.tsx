@@ -268,12 +268,12 @@ export const BossInventoryControl: React.FC = () => {
         </div>
 
         {/* Filter categories */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex flex-wrap items-center gap-1.5 pb-1">
           {[
             { id: 'all', label: 'Zote' },
-            { id: 'phone', label: 'Simu Tu' },
-            { id: 'accessory', label: 'Vifaa (Accessories)' },
-            { id: 'spare', label: 'Spea & Matengenezo' },
+            { id: 'phone', label: 'Simu' },
+            { id: 'accessory', label: 'Vifaa' },
+            { id: 'spare', label: 'Spea' },
             { id: 'other', label: 'Nyingine' },
           ].map(c => (
             <button

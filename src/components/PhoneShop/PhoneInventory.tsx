@@ -258,11 +258,11 @@ export const PhoneInventory: React.FC = () => {
       </div>
 
       {/* Category Filter Pills */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+      <div className="flex flex-wrap items-center gap-1.5 pb-1">
         {[
           { id: 'all', label: 'Zote' },
           { id: 'phone', label: 'Simu' },
-          { id: 'accessory', label: 'Vifaa (Accessories)' },
+          { id: 'accessory', label: 'Vifaa' },
           { id: 'spare', label: 'Spea' },
           { id: 'other', label: 'Nyingine' },
         ].map(cat => (
