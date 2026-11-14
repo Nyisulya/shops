@@ -106,12 +106,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   <Icon className="w-5 h-5" />
                 </div>
                 {item.badge !== undefined && item.badge > 0 && (
-                  <span className="absolute -top-1 -right-1.5 bg-rose-500 text-white font-extrabold text-[10px] w-4 h-4 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-sm animate-bounce">
+                  <span className="absolute -top-1 -right-1.5 bg-rose-500 text-white font-extrabold text-xs w-4 h-4 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-sm animate-bounce">
                     {item.badge}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] mt-0.5 tracking-tight line-clamp-1">{item.label}</span>
+              <span className="text-xs mt-0.5 tracking-tight line-clamp-1">{item.label}</span>
             </button>
           );
         })}

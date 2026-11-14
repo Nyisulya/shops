@@ -123,7 +123,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({ isOpen, onClose, onSyncCom
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-100">Kusawazisha Jioni (Evening Sync)</h2>
-              <p className="text-[11px] text-slate-400">Tuma data za leo kwenye Seva Kuu ya Boss</p>
+              <p className="text-xs text-slate-400">Tuma data za leo kwenye Seva Kuu ya Boss</p>
             </div>
           </div>
           <button
@@ -147,7 +147,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({ isOpen, onClose, onSyncCom
               {isOnline ? <Wifi className="w-5 h-5 text-emerald-400" /> : <WifiOff className="w-5 h-5 text-amber-400" />}
               <div>
                 <div className="text-xs font-bold">{isOnline ? 'Intaneti Imepatikana (Online)' : 'Huna Bando / Offline'}</div>
-                <div className="text-[10px] text-slate-400">
+                <div className="text-xs text-slate-400">
                   {isOnline ? 'Tayari kutuma rekodi zote kwa boss' : 'Washa hotspot au bando la jioni ili kusawazisha'}
                 </div>
               </div>
@@ -215,7 +215,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({ isOpen, onClose, onSyncCom
 
           {/* Offline Database Backup & Restore section */}
           <div className="pt-2 border-t border-slate-800 space-y-2">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <HardDrive className="w-3.5 h-3.5 text-slate-400" />
               <span>Hifadhi Nakala ya Ndani (Offline JSON Backup)</span>
             </div>
@@ -240,7 +240,7 @@ export const SyncModal: React.FC<SyncModalProps> = ({ isOpen, onClose, onSyncCom
                 />
               </label>
             </div>
-            <p className="text-[10px] text-slate-500 leading-tight">
+            <p className="text-xs text-slate-500 leading-tight">
               Unaweza kupakua nakala hii hata kama hakuna intaneti kabisa na kuituma kwa WhatsApp kama usalama wa ziada.
             </p>
           </div>

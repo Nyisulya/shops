@@ -105,7 +105,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className={`text-[10px] uppercase font-extrabold tracking-wider ${isAdmin ? 'text-purple-400' : isBoss ? 'text-amber-400' : 'text-slate-400'}`}>
+              <span className={`text-xs uppercase font-extrabold tracking-wider ${isAdmin ? 'text-purple-400' : isBoss ? 'text-amber-400' : 'text-slate-400'}`}>
                 {isAdmin ? '⚡ SUPER ADMIN' : isBoss ? '👑 Ofisi ya Boss' : 'Duka Lako'}
               </span>
               <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
@@ -147,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Offline / Online Badge */}
           <div 
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-medium border ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border ${
               isOnline 
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' 
                 : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
@@ -179,7 +179,7 @@ export const Header: React.FC<HeaderProps> = ({
             <RefreshCw className={`w-3.5 h-3.5 ${pendingCount > 0 ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }} />
             <span className="hidden xs:inline font-bold">Sync</span>
             {pendingCount > 0 && (
-              <span className="bg-amber-400 text-slate-900 font-extrabold text-[10px] px-1.5 py-0.2 rounded-full">
+              <span className="bg-amber-400 text-slate-900 font-extrabold text-xs px-1.5 py-0.2 rounded-full">
                 {pendingCount}
               </span>
             )}
