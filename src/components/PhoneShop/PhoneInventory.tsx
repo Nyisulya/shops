@@ -26,6 +26,7 @@ import { getShopPin } from '../Auth/PinLogin';
 export const PhoneInventory: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // Boss PIN authorization states for seller restrictions
@@ -57,13 +58,16 @@ export const PhoneInventory: React.FC = () => {
         extra = await db.products.where('branchId').equals('branch_phone').toArray();
       }
       const combined = [...all, ...extra];
-      return combined.filter(p => 
-        p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.imei && p.imei.includes(searchQuery)) ||
-        (p.model && p.model.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
+      return combined.filter(p => {
+        const matchesCategory = categoryFilter === 'all' || p.category === categoryFilter;
+        const matchesSearch =
+          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (p.imei && p.imei.includes(searchQuery)) ||
+          (p.model && p.model.toLowerCase().includes(searchQuery.toLowerCase()));
+        return matchesCategory && matchesSearch;
+      });
     },
-    [searchQuery, activeBranchId]
+    [searchQuery, categoryFilter, activeBranchId]
   );
 
   const handleRequestAuth = (action: { type: 'add' | 'edit' | 'delete'; payload?: any }) => {
@@ -150,8 +154,12 @@ export const PhoneInventory: React.FC = () => {
           isSynced: false
         };
 
+        const mergedProduct: Product = {
+          ...editingProduct,
+          ...updated
+        };
         await db.products.update(editingProduct.id, updated);
-        await queueSync('products', editingProduct.id, 'update', updated);
+        await queueSync('products', editingProduct.id, 'update', mergedProduct);
       } else {
         // Create new product
         const newId = generateUniqueId('prod');
@@ -247,6 +255,30 @@ export const PhoneInventory: React.FC = () => {
           <Lock className="w-3.5 h-3.5 text-blue-200" />
           <span>Ongeza Bidhaa</span>
         </button>
+      </div>
+
+      {/* Category Filter Pills */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        {[
+          { id: 'all', label: 'Zote' },
+          { id: 'phone', label: 'Simu' },
+          { id: 'accessory', label: 'Vifaa (Accessories)' },
+          { id: 'spare', label: 'Spea' },
+          { id: 'other', label: 'Nyingine' },
+        ].map(cat => (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => setCategoryFilter(cat.id)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+              categoryFilter === cat.id
+                ? 'bg-blue-600 text-white shadow-md'
+                : 'bg-slate-800/80 text-slate-400 hover:bg-slate-800 border border-slate-700/50'
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
       </div>
 
       {/* Inventory List */}
@@ -398,11 +430,12 @@ export const PhoneInventory: React.FC = () => {
               {/* Category */}
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">Aina ya Bidhaa:</label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {[
                     { id: 'phone', label: 'Simu', icon: Smartphone },
-                    { id: 'accessory', label: 'Kifaa (Accessory)', icon: Headphones },
-                    { id: 'spare', label: 'Spea / Repair', icon: Wrench },
+                    { id: 'accessory', label: 'Kifaa', icon: Headphones },
+                    { id: 'spare', label: 'Spea', icon: Wrench },
+                    { id: 'other', label: 'Nyingine', icon: Package },
                   ].map(c => (
                     <button
                       key={c.id}

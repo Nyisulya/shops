@@ -130,8 +130,12 @@ export const BossInventoryControl: React.FC = () => {
           isSynced: false
         };
 
+        const mergedProduct: Product = {
+          ...editingProduct,
+          ...updated
+        };
         await db.products.update(editingProduct.id, updated);
-        await queueSync('products', editingProduct.id, 'update', updated);
+        await queueSync('products', editingProduct.id, 'update', mergedProduct);
       } else {
         // Create new product
         const newId = generateUniqueId('prod');
@@ -270,6 +274,7 @@ export const BossInventoryControl: React.FC = () => {
             { id: 'phone', label: 'Simu Tu' },
             { id: 'accessory', label: 'Vifaa (Accessories)' },
             { id: 'spare', label: 'Spea & Matengenezo' },
+            { id: 'other', label: 'Nyingine' },
           ].map(c => (
             <button
               key={c.id}
@@ -415,12 +420,13 @@ export const BossInventoryControl: React.FC = () => {
 
               {/* Category */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">Aina ya Bidhaa:</label>
-                <div className="grid grid-cols-3 gap-1.5">
+                <label className="block text-xs font-bold text-slate-300 mb-1">Aina ya Bidhaa:</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {[
                     { id: 'phone', label: 'Simu', icon: Smartphone },
-                    { id: 'accessory', label: 'Kifaa (Accessory)', icon: Headphones },
-                    { id: 'spare', label: 'Spea / Repair', icon: Wrench },
+                    { id: 'accessory', label: 'Kifaa', icon: Headphones },
+                    { id: 'spare', label: 'Spea', icon: Wrench },
+                    { id: 'other', label: 'Nyingine', icon: Package },
                   ].map(c => (
                     <button
                       key={c.id}

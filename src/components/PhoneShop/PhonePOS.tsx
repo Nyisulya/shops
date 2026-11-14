@@ -244,6 +244,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
             { id: 'phone', label: 'Simu Pekee', icon: Smartphone },
             { id: 'accessory', label: 'Vifaa (Accessories)', icon: Headphones },
             { id: 'spare', label: 'Spea & Matengenezo', icon: Wrench },
+            { id: 'other', label: 'Nyingine', icon: Tag },
           ].map(cat => (
             <button
               key={cat.id}
@@ -287,7 +288,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
                     ? 'bg-emerald-500/20 text-emerald-300'
                     : 'bg-purple-500/20 text-purple-300'
                 }`}>
-                  {prod.category === 'phone' ? 'Simu' : prod.category === 'accessory' ? 'Kifaa' : 'Spea'}
+                  {prod.category === 'phone' ? 'Simu' : prod.category === 'accessory' ? 'Kifaa' : prod.category === 'spare' ? 'Spea' : 'Nyingine'}
                 </span>
 
                 <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
