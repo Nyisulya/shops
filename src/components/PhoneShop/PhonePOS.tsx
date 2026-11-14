@@ -24,7 +24,7 @@ import { formatCurrency } from '../../services/receiptService';
 import confetti from 'canvas-confetti';
 
 interface PhonePOSProps {
-  onSaleComplete: (sale: Sale) => void;
+  onSaleComplete?: (sale: Sale) => void;
 }
 
 export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
@@ -37,6 +37,10 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
   const [customerPhone, setCustomerPhone] = useState('');
   const [discount, setDiscount] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saleSummary, setSaleSummary] = useState<{
+    totalAmount: number;
+    items: Array<{ name: string; soldQty: number; remainingStock: number }>;
+  } | null>(null);
 
   const activeBranchId = localStorage.getItem('active_branch_id') || 'branch_phone_1';
 
@@ -180,13 +184,27 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
         origin: { y: 0.7 }
       });
 
-      // Reset cart and open receipt
+      // Reset cart and show clean stock summary confirmation (without receipt popup)
+      const soldSummaryItems = updatedProductsToSync.map((p, idx) => ({
+        name: p.name,
+        soldQty: cart[idx]?.quantity || 1,
+        remainingStock: p.stock
+      }));
+
       setCart([]);
       setIsCheckoutOpen(false);
       setDiscount(0);
       setCustomerName('');
       setCustomerPhone('');
-      onSaleComplete(newSale);
+
+      if (onSaleComplete) {
+        onSaleComplete(newSale);
+      } else {
+        setSaleSummary({
+          totalAmount: cartFinalTotal,
+          items: soldSummaryItems
+        });
+      }
     } catch (err) {
       console.error('Sale error:', err);
       alert('Imeshindwa kukamilisha mauzo. Tafadhali jaribu tena.');
@@ -530,6 +548,54 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
                 <span>{isSubmitting ? 'Inarekodi...' : `Kamilisha Mauzo (${formatCurrency(cartFinalTotal)})`}</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Sale Confirmation Modal (Replaces Receipt Popup) */}
+      {saleSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-emerald-500/40 rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden p-5 space-y-4 text-center">
+            <div className="w-14 h-14 mx-auto rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+              <Check className="w-7 h-7" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="text-lg font-extrabold text-white">Mauzo Yamekamilika!</h3>
+              <p className="text-sm text-slate-300">
+                Asante! Jumla: <span className="font-extrabold text-emerald-400">{formatCurrency(saleSummary.totalAmount)}</span>
+              </p>
+            </div>
+
+            <div className="bg-slate-800/80 border border-slate-700/70 rounded-2xl p-3 space-y-2 text-left max-h-48 overflow-y-auto">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Stoo Iliyobaki Dukani:
+              </div>
+              {saleSummary.items.map((item, idx) => (
+                <div key={idx} className="flex items-center justify-between gap-2 text-sm border-t border-slate-700/50 pt-1.5 first:border-t-0 first:pt-0">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-slate-100 truncate">{item.name}</div>
+                    <div className="text-xs text-slate-400">Umeuza: {item.soldQty}</div>
+                  </div>
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-lg shrink-0 ${
+                    item.remainingStock === 0
+                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                      : item.remainingStock <= 2
+                      ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                      : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  }`}>
+                    {item.remainingStock === 0 ? 'Zimeisha (0)' : `Zimebaki ${item.remainingStock}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSaleSummary(null)}
+              className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-base shadow-lg shadow-emerald-950/50 active:scale-95 transition-all"
+            >
+              Okay
+            </button>
           </div>
         </div>
       )}

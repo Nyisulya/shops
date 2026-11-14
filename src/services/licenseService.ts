@@ -62,15 +62,15 @@ export const checkLicenseStatus = (): LicenseInfo => {
   const diffTime = expiresAt.getTime() - now.getTime();
   const daysRemaining = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
 
-  const isExpired = daysRemaining <= 0;
-  const isExpiringSoon = daysRemaining > 0 && daysRemaining <= 3;
-  const planName = localStorage.getItem(STORAGE_KEY_PLAN_NAME) || 'Leseni ya Kawaida';
+  const isExpired = false;
+  const isExpiringSoon = false;
+  const planName = localStorage.getItem(STORAGE_KEY_PLAN_NAME) || 'Leseni ya Kudumu';
 
   return {
     deviceId,
-    isActive: !isExpired,
+    isActive: true,
     expiresAt: expiresAtStr,
-    daysRemaining,
+    daysRemaining: Math.max(365, daysRemaining),
     planName,
     isExpired,
     isExpiringSoon

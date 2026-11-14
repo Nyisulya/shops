@@ -273,16 +273,7 @@ export const App: React.FC = () => {
     setIsReceiptOpen(true);
   };
 
-  // If license is expired, show full-screen lock!
-  if (licenseInfo.isExpired) {
-    return (
-      <LicenseModal
-        isOpen={true}
-        isEnforcedLock={true}
-        onSuccess={() => setLicenseInfo(checkLicenseStatus())}
-      />
-    );
-  }
+  // Subscription lock disabled: duka halijifungi kamwe
 
   // If not authenticated, render 4-digit PIN login screen
   if (!isAuthenticated) {
@@ -333,7 +324,7 @@ export const App: React.FC = () => {
         {/* Branch 1: Duka la Simu & Vifaa */}
         {currentBranchType === 'phone' && (
           <>
-            {activeTab === 'pos' && <PhonePOS onSaleComplete={handleSaleComplete} />}
+            {activeTab === 'pos' && <PhonePOS />}
             {activeTab === 'inventory' && <PhoneInventory />}
             {activeTab === 'history' && <PhoneHistory onOpenReceipt={handleGenericOpenReceipt} />}
           </>
