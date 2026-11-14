@@ -68,6 +68,31 @@ const app = express();
 app.use(cors({ origin: CORS_ORIGIN === '*' ? true : CORS_ORIGIN.split(',') }));
 app.use(express.json({ limit: '15mb' }));
 
+// Real-time SSE clients
+const sseClients = new Set();
+
+const broadcastSyncUpdate = (payload) => {
+  const msg = `event: sync-update\ndata: ${JSON.stringify(payload)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(msg);
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+};
+
+// Keep SSE connections alive through Nginx / mobile proxies
+setInterval(() => {
+  for (const client of sseClients) {
+    try {
+      client.write(': heartbeat\n\n');
+    } catch {
+      sseClients.delete(client);
+    }
+  }
+}, 25000);
+
 // Middleware ya ulinzi wa API Key
 const requireApiKey = (req, res, next) => {
   const key = req.headers['x-api-key'] || req.query.apiKey;
@@ -76,6 +101,22 @@ const requireApiKey = (req, res, next) => {
   }
   next();
 };
+
+// Real-time SSE stream kwa ajili ya Push Notifications za papo hapo
+app.get('/api/sync/events', requireApiKey, (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+  res.write(`event: connected\ndata: ${JSON.stringify({ ok: true, time: new Date().toISOString() })}\n\n`);
+  sseClients.add(res);
+
+  req.on('close', () => {
+    sseClients.delete(res);
+  });
+});
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -146,6 +187,10 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
     }
 
     saveDbToDisk();
+
+    if (savedCount > 0 || deletedCount > 0) {
+      broadcastSyncUpdate({ serverTime, savedCount, deletedCount });
+    }
 
     res.json({
       ok: true,

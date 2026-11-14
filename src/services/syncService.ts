@@ -38,6 +38,8 @@ const SYNC_TABLES = [
 ] as const;
 
 let activeSyncPromise: Promise<{ success: boolean; syncedCount: number; pulledCount: number; message: string }> | null = null;
+let resyncRequested = false;
+let immediatePushTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Check how many records are waiting to be uploaded to cloud
 export const getPendingSyncCount = async (): Promise<number> => {
@@ -287,6 +289,12 @@ export const performCloudSync = async (
       };
     } finally {
       activeSyncPromise = null;
+      if (resyncRequested) {
+        resyncRequested = false;
+        setTimeout(() => {
+          triggerBackgroundSync();
+        }, 150);
+      }
     }
   })();
 
@@ -296,11 +304,56 @@ export const performCloudSync = async (
 // Background silent sync (hutumika app ikiona internet imerudi au kila baada ya muda)
 export const triggerBackgroundSync = async (): Promise<void> => {
   if (!navigator.onLine) return;
+  if (activeSyncPromise) {
+    resyncRequested = true;
+    return;
+  }
   try {
     await performCloudSync();
   } catch {
     // Silent fail in background
   }
+};
+
+// Sukuma mabadiliko papo hapo (baada ya 300ms) kila mtu akiongeza, kuhariri au kufuta kitu
+export const scheduleImmediatePush = (): void => {
+  if (!navigator.onLine) return;
+  if (immediatePushTimer) clearTimeout(immediatePushTimer);
+  immediatePushTimer = setTimeout(() => {
+    immediatePushTimer = null;
+    triggerBackgroundSync();
+  }, 300);
+};
+
+// Sikiliza mabadiliko ya Real-Time kutoka kwa Seva (SSE)
+export const subscribeToRealtimeSync = (): (() => void) => {
+  if (typeof EventSource === 'undefined') {
+    return () => {};
+  }
+
+  const { apiUrl, apiKey } = getSyncConfig();
+  const streamUrl = `${apiUrl}/sync/events?apiKey=${encodeURIComponent(apiKey)}`;
+  let es: EventSource | null = null;
+
+  try {
+    es = new EventSource(streamUrl);
+    es.addEventListener('sync-update', () => {
+      triggerBackgroundSync();
+    });
+    es.addEventListener('connected', () => {
+      // Hakikisha tumepull chochote kilichopita wakati hatukuwa connected
+      triggerBackgroundSync();
+    });
+  } catch (err) {
+    console.warn('Realtime SSE connection note:', err);
+  }
+
+  return () => {
+    if (es) {
+      es.close();
+      es = null;
+    }
+  };
 };
 
 // Export entire database as a JSON backup file (for offline safety)

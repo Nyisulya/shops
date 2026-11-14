@@ -49,7 +49,7 @@ export const generateUniqueId = (prefix: string = 'id'): string => {
   return `${prefix}_${timestamp}_${randomStr}`;
 };
 
-// Queue changes for evening cloud sync
+// Queue changes for evening cloud sync & trigger immediate push if online
 export const queueSync = async (table: string, recordId: string, action: 'create' | 'update' | 'delete', data: any) => {
   try {
     await db.syncQueue.put({
@@ -60,6 +60,11 @@ export const queueSync = async (table: string, recordId: string, action: 'create
       data,
       timestamp: new Date().toISOString()
     });
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      import('../services/syncService')
+        .then(m => m.scheduleImmediatePush())
+        .catch(() => {});
+    }
   } catch (err) {
     console.error('Error adding to sync queue:', err);
   }

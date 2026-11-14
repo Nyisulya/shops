@@ -11,7 +11,7 @@ import { SyncModal } from './components/SyncModal';
 import { PinLogin } from './components/Auth/PinLogin';
 import { LicenseModal } from './components/Auth/LicenseModal';
 import { checkLicenseStatus, type LicenseInfo } from './services/licenseService';
-import { triggerBackgroundSync } from './services/syncService';
+import { triggerBackgroundSync, subscribeToRealtimeSync } from './services/syncService';
 
 // Phone Shop Components
 import { PhonePOS } from './components/PhoneShop/PhonePOS';
@@ -67,11 +67,12 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto-sync: internet ikirudi au kila baada ya sekunde 45 ukiwa online
+  // Real-time sync (SSE) + Auto-sync fallback: internet ikirudi au kila baada ya sekunde 45
   useEffect(() => {
     if (!isAuthenticated) return;
 
     triggerBackgroundSync();
+    const unsubscribeRealtime = subscribeToRealtimeSync();
 
     const handleOnline = () => {
       triggerBackgroundSync();
@@ -85,6 +86,7 @@ export const App: React.FC = () => {
     }, 45000);
 
     return () => {
+      unsubscribeRealtime();
       window.removeEventListener('online', handleOnline);
       clearInterval(syncInterval);
     };
