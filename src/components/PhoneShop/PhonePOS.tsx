@@ -584,7 +584,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                       : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                   }`}>
-                    {item.remainingStock === 0 ? 'Zimeisha (0)' : `Zimebaki ${item.remainingStock}`}
+                    {item.remainingStock === 0 ? 'Imeisha' : `Zimebaki ${item.remainingStock}`}
                   </span>
                 </div>
               ))}

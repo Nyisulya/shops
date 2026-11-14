@@ -325,7 +325,7 @@ export const PhoneInventory: React.FC = () => {
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
                       : 'bg-slate-700 text-slate-200'
                   }`}>
-                    {prod.stock} {prod.stock === 1 ? 'pc' : 'pcs'}
+                    {prod.stock === 0 ? 'Imeisha' : `${prod.stock} ${prod.stock === 1 ? 'pc' : 'pcs'}`}
                   </div>
                   <div className="text-[9px] text-slate-400 mt-0.5">Min: {prod.minStock}</div>
                 </div>

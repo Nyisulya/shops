@@ -617,7 +617,7 @@ export const BranchDetailModal: React.FC<BranchDetailModalProps> = ({
                           <span className={`px-2 py-0.5 rounded-md text-xs font-black ${
                             p.stock <= 1 ? 'bg-rose-500 text-white shadow-sm' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                           }`}>
-                            Imebaki: {p.stock} pcs
+                            {p.stock === 0 ? 'Imeisha' : `Imebaki: ${p.stock} pcs`}
                           </span>
                         </div>
                       </div>
@@ -673,12 +673,13 @@ export const BranchDetailModal: React.FC<BranchDetailModalProps> = ({
                     {branchSales.slice(0, 10).map(s => (
                       <div key={s.id} className="p-2.5 bg-slate-800/90 rounded-xl border border-slate-700/60 flex items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-slate-100 flex items-center gap-2">
-                            <span>{s.saleNumber}</span>
-                            <span className="text-[10px] text-slate-400 font-normal">{s.customerName}</span>
+                          <div className="text-xs font-bold text-slate-100 truncate">
+                            {s.items?.length
+                              ? s.items.map(i => `${i.productName} (${i.quantity})`).join(', ')
+                              : s.saleNumber}
                           </div>
-                          <div className="text-[10px] text-slate-400">
-                            {formatDate(s.createdAt)} • {s.items.length} bidhaa • {s.paymentMethod.toUpperCase()}
+                          <div className="text-xs text-slate-400">
+                            {formatDate(s.createdAt)} • {s.paymentMethod.toUpperCase()}{s.customerName ? ` • ${s.customerName}` : ''}
                           </div>
                         </div>
                         <div className="text-right shrink-0 flex items-center gap-2">

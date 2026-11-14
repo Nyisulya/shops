@@ -183,10 +183,14 @@ export const BossOverview: React.FC<BossOverviewProps> = ({
     };
   }, [todayWakalaLog, filteredWakalaTransactions]);
 
-  // Total Business Revenue & Net Profit across all 8 branches for this period
+  // Total Business Revenue, Net Profit & Capital across all 8 branches
   const totalCombinedRevenue = phoneSalesTotal + laundryRevenue + wakalaCommissions;
   const totalCombinedNetProfit = phoneNetProfit + laundryNetProfit + wakalaCommissions;
   const totalOperationsCount = filteredSales.length + filteredRepairs.length + filteredLaundryOrders.length + filteredWakalaTransactions.length;
+  const totalPhoneStockCapital = useMemo(() => {
+    return (products || []).reduce((sum, p) => sum + (Number(p.costPrice) || 0) * (Number(p.stock) || 0), 0);
+  }, [products]);
+  const totalBusinessCapital = totalPhoneStockCapital + wakalaRecon.totalCapital;
 
   const phoneBranches = SHOPS.filter(s => s.type === 'phone');
   const laundryBranches = SHOPS.filter(s => s.type === 'laundry');
@@ -244,11 +248,13 @@ export const BossOverview: React.FC<BossOverviewProps> = ({
             <div className="text-[10px] text-emerald-400">Faida halisi ya kipindi</div>
           </div>
           <div className="col-span-2 sm:col-span-1 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800">
-            <div className="text-[10px] text-slate-400 uppercase font-bold">Wastani kwa Siku</div>
-            <div className="text-base sm:text-xl font-bold text-slate-200">
-              {formatCurrency(Math.round(totalCombinedRevenue))}
+            <div className="text-xs text-amber-300 uppercase font-bold">Mtaji Wote (Stoo + Wakala)</div>
+            <div className="text-base sm:text-xl font-black text-amber-300">
+              {formatCurrency(totalBusinessCapital)}
             </div>
-            <div className="text-[10px] text-amber-300/80">Kulingana na tarehe zilizochaguliwa</div>
+            <div className="text-xs text-slate-400">
+              Stoo: {formatCurrency(totalPhoneStockCapital)} • Wakala: {formatCurrency(wakalaRecon.totalCapital)}
+            </div>
           </div>
         </div>
       </div>
