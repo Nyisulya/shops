@@ -350,7 +350,10 @@ const notifyFromPushedRecords = async (newSales, updatedSales, newRepairs, newWa
         targetBranches
       );
       const staffTokens = staffRows.map(r => r.token);
-      if (!staffTokens.length) continue;
+      if (!staffTokens.length) {
+        pushLog({ title: 'NO_STAFF_TOKENS', target: branchId, tokens: 0 });
+        continue;
+      }
 
       const shopName = getBranchDisplayName(branchId);
       const first = items[0];
