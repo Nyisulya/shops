@@ -78,7 +78,7 @@ export const registerForPushNotifications = async (role: string, branchId?: stri
     }
 
     let permStatus = await PushNotifications.checkPermissions();
-    if (permStatus.receive === 'prompt') {
+    if (permStatus.receive === 'prompt' || permStatus.receive === 'prompt-with-rationale') {
       permStatus = await PushNotifications.requestPermissions();
     }
 

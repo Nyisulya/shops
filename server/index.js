@@ -363,11 +363,14 @@ app.post('/api/push/register', requireApiKey, (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   const rows = queryAll('SELECT COUNT(*) as total FROM sync_records WHERE deleted = 0');
+  const tokenRows = queryAll('SELECT role, COUNT(*) as count FROM device_tokens GROUP BY role');
   res.json({
     ok: true,
-    service: 'Maduka Tatu Sync Server',
+    service: 'Getjan Sync Server',
     time: new Date().toISOString(),
-    totalRecords: Number(rows[0]?.total || 0)
+    totalRecords: Number(rows[0]?.total || 0),
+    fcmEnabled,
+    registeredDevices: tokenRows
   });
 });
 
