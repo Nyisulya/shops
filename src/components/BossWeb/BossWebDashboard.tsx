@@ -389,6 +389,12 @@ export const BossWebDashboard: React.FC = () => {
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prodName.trim() || !prodSellingPrice) return;
+    const stockNum = Number(prodStock || 0);
+    const minStockNum = Number(prodMinStock || 0);
+    if (minStockNum > stockNum) {
+      alert(`Tahadhari ya stoo chache (${minStockNum}) haiwezi kuzidi idadi ya bidhaa (${stockNum}).`);
+      return;
+    }
     setIsSavingProduct(true);
     try {
       const res = await fetch(`${apiUrl}/boss/products`, {
@@ -1345,6 +1351,7 @@ export const BossWebDashboard: React.FC = () => {
                 <input
                   type="number"
                   min={0}
+                  max={Math.max(0, Number(prodStock || 0))}
                   value={prodMinStock}
                   onChange={e => setProdMinStock(e.target.value)}
                   className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"

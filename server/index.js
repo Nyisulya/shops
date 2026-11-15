@@ -163,6 +163,12 @@ app.get('/api/sync/events', requireApiKey, (req, res) => {
   });
 });
 
+const lastPushLogs = [];
+const pushLog = (entry) => {
+  lastPushLogs.unshift({ time: new Date().toISOString(), ...entry });
+  if (lastPushLogs.length > 10) lastPushLogs.length = 10;
+};
+
 const sendPushToTokens = async (tokens, title, body, data = {}) => {
   if (!fcmEnabled || !tokens.length) return;
   try {
@@ -186,13 +192,23 @@ const sendPushToTokens = async (tokens, title, body, data = {}) => {
 
     // Clean up invalid tokens
     const badTokens = [];
+    const errors = [];
     response.responses.forEach((resp, idx) => {
       if (!resp.success) {
-        const code = resp.error?.code || '';
+        const code = resp.error?.code || resp.error?.message || 'unknown';
+        errors.push(code);
         if (code.includes('registration-token-not-registered') || code.includes('invalid-registration-token')) {
           badTokens.push(uniqueTokens[idx]);
         }
       }
+    });
+    pushLog({
+      title,
+      target: data?.branchId || data?.type || 'all',
+      tokens: uniqueTokens.length,
+      success: response.successCount,
+      failure: response.failureCount,
+      errors: errors.slice(0, 3)
     });
     if (badTokens.length > 0) {
       for (const t of badTokens) {
@@ -202,6 +218,7 @@ const sendPushToTokens = async (tokens, title, body, data = {}) => {
     }
   } catch (err) {
     console.warn('FCM send error:', err?.message);
+    pushLog({ title, target: data?.branchId || 'error', error: err?.message });
   }
 };
 
@@ -384,7 +401,8 @@ app.get('/api/health', (req, res) => {
     time: new Date().toISOString(),
     totalRecords: Number(rows[0]?.total || 0),
     fcmEnabled,
-    registeredDevices: tokenRows
+    registeredDevices: tokenRows,
+    lastPushLogs
   });
 });
 
@@ -816,6 +834,12 @@ app.post('/api/boss/products', requireApiKey, (req, res) => {
 
     if (!branchId || !name || Number.isNaN(sellingPrice) || sellingPrice <= 0) {
       return res.status(400).json({ ok: false, error: 'Jaza tawi, jina la bidhaa, na bei ya kuuza.' });
+    }
+    if (!Number.isNaN(stock) && !Number.isNaN(minStock) && minStock > stock) {
+      return res.status(400).json({
+        ok: false,
+        error: `Tahadhari ya stoo chache (${minStock}) haiwezi kuzidi idadi ya bidhaa (${stock}).`
+      });
     }
 
     const now = new Date().toISOString();
