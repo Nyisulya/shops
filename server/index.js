@@ -314,9 +314,13 @@ const notifyFromPushedRecords = async (newSales, updatedSales, newRepairs, newWa
     }
 
     for (const [branchId, items] of byBranch.entries()) {
+      const targetBranches = (branchId === 'branch_phone_1' || branchId === 'branch_phone')
+        ? ['branch_phone_1', 'branch_phone']
+        : [branchId];
+      const placeholders = targetBranches.map(() => '?').join(',');
       const staffRows = queryAll(
-        "SELECT token FROM device_tokens WHERE branch_id = ? AND role NOT IN ('boss', 'admin')",
-        [branchId]
+        `SELECT token FROM device_tokens WHERE branch_id IN (${placeholders}) AND role NOT IN ('boss', 'admin')`,
+        targetBranches
       );
       const staffTokens = staffRows.map(r => r.token);
       if (!staffTokens.length) continue;
@@ -363,7 +367,7 @@ app.post('/api/push/register', requireApiKey, (req, res) => {
 // Health check
 app.get('/api/health', (req, res) => {
   const rows = queryAll('SELECT COUNT(*) as total FROM sync_records WHERE deleted = 0');
-  const tokenRows = queryAll('SELECT role, COUNT(*) as count FROM device_tokens GROUP BY role');
+  const tokenRows = queryAll('SELECT role, branch_id as branchId, COUNT(*) as count FROM device_tokens GROUP BY role, branch_id');
   res.json({
     ok: true,
     service: 'Getjan Sync Server',
