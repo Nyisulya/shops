@@ -836,7 +836,14 @@ export const BossWebDashboard: React.FC = () => {
                 <tbody className="divide-y divide-slate-800/80">
                   {filteredInventory.map((p: any) => (
                     <tr key={p.id} className="hover:bg-slate-800/40">
-                      <td className="py-2.5 pr-3 font-bold text-white">{p.name}</td>
+                      <td className="py-2.5 pr-3">
+                        <div className="font-bold text-white">{p.name}</div>
+                        {(p.ram || p.storage) && (
+                          <div className="text-[11px] text-emerald-400 font-semibold">
+                            {[p.ram ? `RAM ${p.ram}` : '', p.storage || ''].filter(Boolean).join(' • ')}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-2.5 pr-3 text-slate-300">{branchLabel(p.branchId)}</td>
                       <td className="py-2.5 pr-3 text-slate-300">{categoryLabel(p.category)}</td>
                       <td className="py-2.5 pr-3 text-slate-300">{formatCurrency(p.costPrice)}</td>
