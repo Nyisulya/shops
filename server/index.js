@@ -855,6 +855,7 @@ app.post('/api/boss/products', requireApiKey, (req, res) => {
       imei: body.imei ? String(body.imei).trim() : '',
       model: body.model ? String(body.model).trim() : '',
       storage: body.storage ? String(body.storage).trim() : '',
+      ram: body.ram ? String(body.ram).trim() : '',
       condition: body.condition === 'used' ? 'used' : 'new',
       costPrice: Number.isNaN(costPrice) ? 0 : costPrice,
       sellingPrice,

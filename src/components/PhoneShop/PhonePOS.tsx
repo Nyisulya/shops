@@ -312,9 +312,9 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
                     IMEI: {prod.imei}
                   </p>
                 )}
-                {prod.warrantyMonths && (
-                  <p className="text-xs text-emerald-400">
-                    Warranty miezi {prod.warrantyMonths}
+                {(prod.ram || prod.storage) && (
+                  <p className="text-xs text-emerald-400 font-semibold truncate">
+                    {[prod.ram ? `RAM ${prod.ram}` : '', prod.storage || ''].filter(Boolean).join(' • ')}
                   </p>
                 )}
               </div>

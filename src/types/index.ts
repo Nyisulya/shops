@@ -21,6 +21,7 @@ export interface Product {
   imei?: string; // For phones
   model?: string;
   storage?: string; // 64GB, 128GB, etc.
+  ram?: string; // 4GB, 8GB, etc.
   condition?: 'new' | 'used';
   costPrice: number;
   sellingPrice: number;

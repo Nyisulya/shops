@@ -30,6 +30,7 @@ const PHONE_BRANCHES = [
 ];
 
 const STORAGE_OPTIONS = ['16GB', '32GB', '64GB', '128GB', '256GB', '512GB'];
+const RAM_OPTIONS = ['2GB', '3GB', '4GB', '6GB', '8GB', '12GB', '16GB'];
 
 // Tarehe kwa saa za Tanzania (local), si UTC
 const toLocalISO = (d: Date) => {
@@ -105,6 +106,7 @@ export const BossWebDashboard: React.FC = () => {
   const [prodCondition, setProdCondition] = useState<'new' | 'used'>('new');
   const [prodImei, setProdImei] = useState('');
   const [prodStorage, setProdStorage] = useState('');
+  const [prodRam, setProdRam] = useState('');
   const [prodCostPrice, setProdCostPrice] = useState('');
   const [prodSellingPrice, setProdSellingPrice] = useState('');
   const [prodStock, setProdStock] = useState('1');
@@ -364,6 +366,7 @@ export const BossWebDashboard: React.FC = () => {
     setProdCondition('new');
     setProdImei('');
     setProdStorage('');
+    setProdRam('');
     setProdCostPrice('');
     setProdSellingPrice('');
     setProdStock('1');
@@ -379,6 +382,7 @@ export const BossWebDashboard: React.FC = () => {
     setProdCondition(p.condition === 'used' ? 'used' : 'new');
     setProdImei(p.imei || '');
     setProdStorage(p.storage || '');
+    setProdRam(p.ram || '');
     setProdCostPrice(String(p.costPrice ?? ''));
     setProdSellingPrice(String(p.sellingPrice ?? ''));
     setProdStock(String(p.stock ?? 0));
@@ -408,6 +412,7 @@ export const BossWebDashboard: React.FC = () => {
           condition: prodCondition,
           imei: prodImei.trim(),
           storage: prodStorage.trim(),
+          ram: prodRam.trim(),
           costPrice: Number(prodCostPrice || 0),
           sellingPrice: Number(prodSellingPrice),
           stock: Number(prodStock || 0),
@@ -1211,7 +1216,7 @@ export const BossWebDashboard: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">Hali</label>
                 <select
@@ -1221,6 +1226,22 @@ export const BossWebDashboard: React.FC = () => {
                 >
                   <option value="new">Mpya</option>
                   <option value="used">Mtumba (Used)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1">RAM (Hiari)</label>
+                <select
+                  value={prodRam}
+                  onChange={e => setProdRam(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
+                >
+                  <option value="">-- Chagua --</option>
+                  {RAM_OPTIONS.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                  {prodRam && !RAM_OPTIONS.includes(prodRam) && (
+                    <option value={prodRam}>{prodRam}</option>
+                  )}
                 </select>
               </div>
               <div>
