@@ -177,7 +177,9 @@ const sendPushToTokens = async (tokens, title, body, data = {}) => {
         priority: 'high',
         notification: {
           channelId: 'maduka_notifications',
-          sound: 'default'
+          sound: 'default',
+          icon: 'ic_stat_maduka',
+          color: '#F59E0B'
         }
       }
     });
@@ -205,22 +207,69 @@ const sendPushToTokens = async (tokens, title, body, data = {}) => {
 
 const formatTzs = (n) => `TZS ${Number(n || 0).toLocaleString('en-US')}`;
 
-const notifyFromPushedRecords = async (newSales, newRepairs, newWakala, newLaundry, updatedProducts) => {
+const BRANCH_NAMES = {
+  branch_phone: 'Duka la Soko Kuu',
+  branch_phone_1: 'Duka la Soko Kuu',
+  branch_phone_2: 'Duka la Vunja Bei',
+  branch_phone_3: 'Duka la Makoroboi',
+  branch_laundry: 'Duka la Laundry',
+  branch_wakala: 'Duka la Wakala'
+};
+
+const getBranchDisplayName = (branchId) => {
+  if (!branchId) return 'Dukani';
+  if (BRANCH_NAMES[branchId]) return BRANCH_NAMES[branchId];
+  const rows = queryAll("SELECT data FROM sync_records WHERE table_name = 'branches' AND id = ? AND deleted = 0", [String(branchId)]);
+  if (rows.length > 0) {
+    try {
+      const b = JSON.parse(rows[0].data);
+      if (b?.name) return b.name;
+    } catch {}
+  }
+  return String(branchId);
+};
+
+const formatSaleItemsText = (sale) => {
+  const list = Array.isArray(sale?.items) ? sale.items : [];
+  if (!list.length) return sale?.saleNumber || 'Bidhaa';
+  return list
+    .map(i => (Number(i.quantity) > 0 ? `${i.productName} (${i.quantity})` : i.productName))
+    .join(', ');
+};
+
+const notifyFromPushedRecords = async (newSales, updatedSales, newRepairs, newWakala, newLaundry, updatedProducts) => {
   if (!fcmEnabled) return;
 
   const bossRows = queryAll("SELECT token FROM device_tokens WHERE role IN ('boss', 'admin')");
   const bossTokens = bossRows.map(r => r.token);
 
   if (bossTokens.length > 0) {
-    if (newSales.length > 0) {
-      const total = newSales.reduce((s, x) => s + Number(x.finalAmount || 0), 0);
+    for (const s of newSales) {
+      const shopName = getBranchDisplayName(s.branchId);
+      const itemsText = formatSaleItemsText(s);
       await sendPushToTokens(
         bossTokens,
-        'Mauzo Mapya Dukani',
-        newSales.length === 1
-          ? `Mauzo ya ${formatTzs(total)} yamefanyika.`
-          : `Mauzo ${newSales.length} mapya yenye jumla ya ${formatTzs(total)}.`,
-        { type: 'sale' }
+        `Mauzo Mapya • ${shopName}`,
+        `${itemsText} • ${formatTzs(s.finalAmount)}`,
+        { type: 'sale', branchId: s.branchId || '' }
+      );
+    }
+
+    for (const s of updatedSales) {
+      if (s.status !== 'returned' && s.status !== 'edited') continue;
+      const shopName = getBranchDisplayName(s.branchId);
+      const itemsText = formatSaleItemsText(s);
+      const title = s.status === 'returned'
+        ? `Mzigo Umerudishwa • ${shopName}`
+        : `Mauzo Yamehaririwa • ${shopName}`;
+      const body = s.status === 'returned'
+        ? `${itemsText} imerudishwa${s.returnNote ? ` • ${s.returnNote}` : ''}`
+        : `${itemsText} • ${formatTzs(s.finalAmount)}${s.returnNote ? ` (${s.returnNote})` : ''}`;
+      await sendPushToTokens(
+        bossTokens,
+        title,
+        body,
+        { type: 'sale_edit', branchId: s.branchId || '' }
       );
     }
 
@@ -255,8 +304,8 @@ const notifyFromPushedRecords = async (newSales, newRepairs, newWakala, newLaund
     }
   }
 
-  // Notify branch attendants when products/stock are added or updated
-  if (updatedProducts.length > 0) {
+  // Notify branch attendants ONLY when Boss/admin adds or updates stock (not when a sale decrements stock)
+  if (updatedProducts.length > 0 && newSales.length === 0 && updatedSales.length === 0) {
     const byBranch = new Map();
     for (const p of updatedProducts) {
       if (!p.branchId) continue;
@@ -272,13 +321,14 @@ const notifyFromPushedRecords = async (newSales, newRepairs, newWakala, newLaund
       const staffTokens = staffRows.map(r => r.token);
       if (!staffTokens.length) continue;
 
+      const shopName = getBranchDisplayName(branchId);
       const first = items[0];
       await sendPushToTokens(
         staffTokens,
-        items.length === 1 ? 'Stoo / Mzigo Umesasishwa' : `Bidhaa ${items.length} Zimesasishwa`,
+        `Mzigo Mpya • ${shopName}`,
         items.length === 1
-          ? `${first.name} (Stoo: ${first.stock})`
-          : `${first.name} na bidhaa nyingine ${items.length - 1} zimewekwa stoo.`,
+          ? `Boss ameweka: ${first.name} (Stoo: ${first.stock}) • ${formatTzs(first.sellingPrice)}`
+          : `Boss ameweka ${first.name} na bidhaa nyingine ${items.length - 1} stoo.`,
         { type: 'product', branchId }
       );
     }
@@ -330,6 +380,7 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
     let savedCount = 0;
     let deletedCount = 0;
     const newSales = [];
+    const updatedSales = [];
     const newRepairs = [];
     const newWakala = [];
     const newLaundry = [];
@@ -378,6 +429,8 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
           else if (rec.table === 'repairs') newRepairs.push(cleanData);
           else if (rec.table === 'wakalaTransactions') newWakala.push(cleanData);
           else if (rec.table === 'laundryOrders') newLaundry.push(cleanData);
+        } else if (rec.table === 'sales' && (cleanData.status === 'returned' || cleanData.status === 'edited')) {
+          updatedSales.push(cleanData);
         }
         if (rec.table === 'products') {
           updatedProducts.push(cleanData);
@@ -403,7 +456,7 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
 
     if (savedCount > 0 || deletedCount > 0) {
       broadcastSyncUpdate({ serverTime, savedCount, deletedCount });
-      notifyFromPushedRecords(newSales, newRepairs, newWakala, newLaundry, updatedProducts).catch(() => {});
+      notifyFromPushedRecords(newSales, updatedSales, newRepairs, newWakala, newLaundry, updatedProducts).catch(() => {});
     }
 
     res.json({
@@ -777,7 +830,7 @@ app.post('/api/boss/products', requireApiKey, (req, res) => {
     );
     saveDbToDisk();
     broadcastSyncUpdate({ serverTime: now, savedCount: 1, deletedCount: 0 });
-    notifyFromPushedRecords([], [], [], [], [productData]).catch(() => {});
+    notifyFromPushedRecords([], [], [], [], [], [productData]).catch(() => {});
 
     res.json({ ok: true, id: prodId, product: productData });
   } catch (err) {
