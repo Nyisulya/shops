@@ -61,6 +61,9 @@ export interface Sale {
   customerPhone?: string;
   cashierName: string;
   notes?: string;
+  status?: 'completed' | 'edited' | 'returned';
+  editedAt?: string;
+  returnNote?: string;
   createdAt: string;
   isSynced: boolean;
 }
@@ -241,6 +244,9 @@ export interface Expense {
   amount: number;
   recordedBy?: string;
   notes?: string;
+  status?: 'completed' | 'edited' | 'returned';
+  editedAt?: string;
+  returnNote?: string;
   createdAt: string;
   isSynced: boolean;
 }

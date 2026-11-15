@@ -29,6 +29,22 @@ const PHONE_BRANCHES = [
   { id: 'branch_phone_3', name: 'Duka la Makoroboi', code: 'PH-03' }
 ];
 
+const STORAGE_OPTIONS = ['16GB', '32GB', '64GB', '128GB', '256GB', '512GB'];
+
+// Tarehe kwa saa za Tanzania (local), si UTC
+const toLocalISO = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+const shortDate = (iso: string) => {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+};
+
 const branchLabel = (branchId?: string) => {
   if (!branchId || branchId === 'branch_phone') return 'Duka la Soko Kuu';
   return PHONE_BRANCHES.find(b => b.id === branchId)?.name || branchId;
@@ -50,9 +66,14 @@ export const BossWebDashboard: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'inventory' | 'salaries' | 'expenses' | 'sales'>('overview');
   const [selectedBranch, setSelectedBranch] = useState<string>('all');
-  const [datePreset, setDatePreset] = useState<'today' | 'month' | 'all' | 'custom'>('month');
-  const [customFrom, setCustomFrom] = useState(() => new Date().toISOString().slice(0, 10));
-  const [customTo, setCustomTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [datePreset, setDatePreset] = useState<'today' | 'yesterday' | 'week' | 'month' | 'all' | 'custom'>('month');
+  // Draft (unazoweza kubadilisha) vs Applied (zinazotumwa kwa seva)
+  const [customFrom, setCustomFrom] = useState(() => toLocalISO(new Date()));
+  const [customTo, setCustomTo] = useState(() => toLocalISO(new Date()));
+  const [appliedCustom, setAppliedCustom] = useState(() => {
+    const today = toLocalISO(new Date());
+    return { from: today, to: today };
+  });
 
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -92,15 +113,62 @@ export const BossWebDashboard: React.FC = () => {
 
   const dateRange = useMemo(() => {
     const now = new Date();
-    const today = now.toISOString().slice(0, 10);
+    const today = toLocalISO(now);
     if (datePreset === 'today') return { from: today, to: today };
+    if (datePreset === 'yesterday') {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 1);
+      const y = toLocalISO(d);
+      return { from: y, to: y };
+    }
+    if (datePreset === 'week') {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 6);
+      return { from: toLocalISO(d), to: today };
+    }
     if (datePreset === 'month') {
       const monthStart = `${today.slice(0, 7)}-01`;
       return { from: monthStart, to: today };
     }
-    if (datePreset === 'custom') return { from: customFrom, to: customTo };
+    if (datePreset === 'custom') return { from: appliedCustom.from, to: appliedCustom.to };
     return { from: '', to: '' };
-  }, [datePreset, customFrom, customTo]);
+  }, [datePreset, appliedCustom]);
+
+  const dateRangeLabel = useMemo(() => {
+    if (datePreset === 'all') return 'Zote (bila kikomo)';
+    if (!dateRange.from) return '';
+    if (dateRange.from === dateRange.to) return shortDate(dateRange.from);
+    return `${shortDate(dateRange.from)} — ${shortDate(dateRange.to)}`;
+  }, [datePreset, dateRange]);
+
+  const isCustomDirty = customFrom !== appliedCustom.from || customTo !== appliedCustom.to;
+
+  const applyCustomFilter = () => {
+    if (!customFrom || !customTo) return;
+    const from = customFrom <= customTo ? customFrom : customTo;
+    const to = customFrom <= customTo ? customTo : customFrom;
+    setAppliedCustom({ from, to });
+    setDatePreset('custom');
+  };
+
+  const prodProfit = useMemo(() => {
+    const cost = Number(prodCostPrice || 0);
+    const sell = Number(prodSellingPrice || 0);
+    const qty = Number(prodStock || 0);
+    const unit = sell - cost;
+    const margin = sell > 0 ? (unit / sell) * 100 : 0;
+    const hasCost = prodCostPrice !== '' && Number(prodCostPrice) > 0;
+    const hasSell = prodSellingPrice !== '' && Number(prodSellingPrice) > 0;
+    return {
+      unit,
+      margin,
+      qty,
+      total: unit * qty,
+      hasCost,
+      hasSell,
+      ready: hasCost && hasSell
+    };
+  }, [prodCostPrice, prodSellingPrice, prodStock]);
 
   const fetchOverview = useCallback(async () => {
     if (!apiKey) return;
@@ -144,19 +212,21 @@ export const BossWebDashboard: React.FC = () => {
     return () => es.close();
   }, [apiKey, apiUrl, fetchOverview]);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitPin = useCallback(async (pinValue: string) => {
+    if (!pinValue || isLoggingIn) return;
     setLoginError(null);
     setIsLoggingIn(true);
     try {
       const res = await fetch(`${apiUrl}/boss/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pin })
+        body: JSON.stringify({ pin: pinValue })
       });
       const json = await res.json();
       if (!res.ok || !json.ok) {
         setLoginError(json.error || 'PIN si sahihi.');
+        // Kama bado hajafikisha tarakimu 6, mruhusu kuendelea kuandika
+        if (pinValue.length >= 6) setPin('');
         return;
       }
       sessionStorage.setItem('boss_web_api_key', json.apiKey);
@@ -166,6 +236,21 @@ export const BossWebDashboard: React.FC = () => {
       setLoginError('Imeshindwa kuwasiliana na seva.');
     } finally {
       setIsLoggingIn(false);
+    }
+  }, [apiUrl, isLoggingIn]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await submitPin(pin);
+  };
+
+  // PIN inajifungua yenyewe mara tu inapofika urefu kamili (4 au 6 tarakimu)
+  const handlePinChange = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 6);
+    setPin(digits);
+    setLoginError(null);
+    if (digits.length === 4 || digits.length === 6) {
+      submitPin(digits);
     }
   };
 
@@ -376,15 +461,18 @@ export const BossWebDashboard: React.FC = () => {
               required
               autoFocus
               value={pin}
-              onChange={e => setPin(e.target.value)}
+              onChange={e => handlePinChange(e.target.value)}
               placeholder="••••"
               className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-2xl text-center tracking-[0.5em] font-black text-white focus:outline-none focus:border-amber-500"
             />
+            <p className="mt-2 text-[11px] text-slate-400 text-center">
+              {isLoggingIn ? 'Inahakiki PIN...' : 'Itajifungua yenyewe — hakuna haja ya kubonyeza kitufe.'}
+            </p>
           </div>
 
           <button
             type="submit"
-            disabled={isLoggingIn}
+            disabled={isLoggingIn || !pin}
             className="w-full py-3.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-base transition-all active:scale-95 disabled:opacity-50"
           >
             {isLoggingIn ? 'Inahakiki...' : 'Ingia Ofisi ya Boss'}
@@ -435,8 +523,9 @@ export const BossWebDashboard: React.FC = () => {
 
       <main className="max-w-7xl mx-auto p-4 space-y-5">
         {/* Branch & Date Filters */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-1.5">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2.5">
+          {/* Row 1: Maduka (fixed height, haihama) */}
+          <div className="flex flex-wrap items-center gap-1.5 min-h-[34px]">
             <button
               onClick={() => setSelectedBranch('all')}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
@@ -462,17 +551,26 @@ export const BossWebDashboard: React.FC = () => {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Calendar className="w-4 h-4 text-slate-400 mr-1" />
+          {/* Row 2: Tarehe (fixed height — vitufe havihami wala kushuka) */}
+          <div className="flex flex-wrap items-center gap-1.5 min-h-[34px] border-t border-slate-800 pt-2.5">
+            <Calendar className="w-4 h-4 text-slate-400 mr-1 shrink-0" />
             {[
               { id: 'today', label: 'Leo' },
+              { id: 'yesterday', label: 'Jana' },
+              { id: 'week', label: 'Wiki' },
               { id: 'month', label: 'Mwezi Huu' },
               { id: 'all', label: 'Zote' },
               { id: 'custom', label: 'Tarehe Maalum' }
             ].map(d => (
               <button
                 key={d.id}
-                onClick={() => setDatePreset(d.id as any)}
+                onClick={() => {
+                  if (d.id === 'custom') {
+                    setCustomFrom(appliedCustom.from);
+                    setCustomTo(appliedCustom.to);
+                  }
+                  setDatePreset(d.id as any);
+                }}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                   datePreset === d.id
                     ? 'bg-emerald-600 text-white'
@@ -482,24 +580,45 @@ export const BossWebDashboard: React.FC = () => {
                 {d.label}
               </button>
             ))}
-            {datePreset === 'custom' && (
-              <div className="flex items-center gap-1.5 ml-1">
-                <input
-                  type="date"
-                  value={customFrom}
-                  onChange={e => setCustomFrom(e.target.value)}
-                  className="px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white"
-                />
-                <span className="text-xs text-slate-400">hadi</span>
-                <input
-                  type="date"
-                  value={customTo}
-                  onChange={e => setCustomTo(e.target.value)}
-                  className="px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white"
-                />
-              </div>
+            {dateRangeLabel && (
+              <span className="ml-1 px-2.5 py-1 rounded-lg bg-slate-800/80 border border-slate-700 text-[11px] font-bold text-slate-300">
+                {dateRangeLabel}
+              </span>
             )}
           </div>
+
+          {/* Row 3: Tarehe Maalum (inaonekana tu ikichaguliwa — haisukumi vitufe vingine) */}
+          {datePreset === 'custom' && (
+            <div className="flex flex-wrap items-center gap-1.5 min-h-[34px] border-t border-slate-800 pt-2.5">
+              <span className="text-[11px] font-bold text-slate-400 uppercase mr-1">Kuanzia</span>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={e => setCustomFrom(e.target.value)}
+                className="px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white"
+              />
+              <span className="text-xs text-slate-400">hadi</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={e => setCustomTo(e.target.value)}
+                className="px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white"
+              />
+              <button
+                type="button"
+                onClick={applyCustomFilter}
+                disabled={!customFrom || !customTo}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all disabled:opacity-50 ${
+                  isCustomDirty
+                    ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 animate-pulse'
+                    : 'bg-emerald-600 text-white'
+                }`}
+              >
+                <Search className="w-3.5 h-3.5" />
+                <span>Tumia Filter</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {errorMsg && (
@@ -592,11 +711,24 @@ export const BossWebDashboard: React.FC = () => {
                   {(data?.sales || []).slice(0, 15).map((s: any) => (
                     <div key={s.id} className="p-3 bg-slate-800/70 border border-slate-700/60 rounded-2xl flex items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="text-sm font-bold text-white truncate">
-                          {(s.items || []).map((i: any) => `${i.productName} (${i.quantity})`).join(', ') || s.saleNumber}
+                        <div className="text-sm font-bold text-white truncate flex items-center gap-2">
+                          <span className="truncate">
+                            {(s.items || []).map((i: any) => `${i.productName} (${i.quantity})`).join(', ') || s.saleNumber}
+                          </span>
+                          {s.status === 'returned' && (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/30 shrink-0">
+                              Imerudishwa
+                            </span>
+                          )}
+                          {s.status === 'edited' && (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                              Imehaririwa
+                            </span>
+                          )}
                         </div>
                         <div className="text-xs text-slate-400">
                           {branchLabel(s.branchId)} • {formatDate(s.createdAt)} • {String(s.paymentMethod || '').toUpperCase()}
+                          {s.returnNote ? ` • ${s.returnNote}` : ''}
                         </div>
                       </div>
                       <div className="font-black text-sm text-blue-400 shrink-0">{formatCurrency(s.finalAmount)}</div>
@@ -622,15 +754,15 @@ export const BossWebDashboard: React.FC = () => {
                         <div className="min-w-0">
                           <div className="text-sm font-bold text-white truncate">{p.name}</div>
                           <div className="text-xs text-slate-400">
-                            {branchLabel(p.branchId)} • {categoryLabel(p.category)}
+                            {branchLabel(p.branchId)} • {categoryLabel(p.category)} • Kikomo: {Number(p.minStock || 1)}
                           </div>
                         </div>
-                        <span className={`px-2.5 py-1 rounded-xl text-xs font-extrabold shrink-0 ${
+                        <span className={`px-2.5 py-1 rounded-xl text-xs font-extrabold shrink-0 whitespace-nowrap ${
                           Number(p.stock) === 0
                             ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                             : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                         }`}>
-                          {Number(p.stock) === 0 ? 'Imeisha' : `Imebaki ${p.stock}`}
+                          {Number(p.stock) === 0 ? 'Imeisha' : `Zimebaki ${p.stock}`}
                         </span>
                       </div>
                     ))}
@@ -699,11 +831,29 @@ export const BossWebDashboard: React.FC = () => {
                       <td className="py-2.5 pr-3 text-slate-300">{formatCurrency(p.costPrice)}</td>
                       <td className="py-2.5 pr-3 text-blue-400 font-bold">{formatCurrency(p.sellingPrice)}</td>
                       <td className="py-2.5 pr-3">
-                        <span className={`px-2 py-0.5 rounded-lg text-xs font-bold ${
-                          Number(p.stock) === 0 ? 'bg-rose-500/20 text-rose-300' : 'bg-slate-800 text-slate-200'
-                        }`}>
-                          {Number(p.stock) === 0 ? 'Imeisha' : p.stock}
-                        </span>
+                        {(() => {
+                          const stock = Number(p.stock || 0);
+                          const minStock = Number(p.minStock || 1);
+                          if (stock === 0) {
+                            return (
+                              <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                Imeisha
+                              </span>
+                            );
+                          }
+                          if (stock <= minStock) {
+                            return (
+                              <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                Zimebaki {stock}
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className="px-2 py-0.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-200">
+                              {stock}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td className="py-2.5 pr-3 text-right font-bold text-amber-300">
                         {formatCurrency(Number(p.costPrice || 0) * Number(p.stock || 0))}
@@ -969,7 +1119,20 @@ export const BossWebDashboard: React.FC = () => {
                       <td className="py-2.5 pr-3 text-slate-300 whitespace-nowrap">{formatDate(s.createdAt)}</td>
                       <td className="py-2.5 pr-3 text-slate-300">{branchLabel(s.branchId)}</td>
                       <td className="py-2.5 pr-3 font-bold text-white">
-                        {(s.items || []).map((i: any) => `${i.productName} (${i.quantity})`).join(', ') || s.saleNumber}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span>{(s.items || []).map((i: any) => `${i.productName} (${i.quantity})`).join(', ') || s.saleNumber}</span>
+                          {s.status === 'returned' && (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                              Imerudishwa
+                            </span>
+                          )}
+                          {s.status === 'edited' && (
+                            <span className="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                              Imehaririwa
+                            </span>
+                          )}
+                        </div>
+                        {s.returnNote && <div className="text-[11px] font-normal text-slate-400 mt-0.5">{s.returnNote}</div>}
                       </td>
                       <td className="py-2.5 pr-3 uppercase text-xs text-slate-300">{s.paymentMethod}</td>
                       <td className="py-2.5 text-right font-black text-blue-400">{formatCurrency(s.finalAmount)}</td>
@@ -1056,13 +1219,19 @@ export const BossWebDashboard: React.FC = () => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">Storage (Hiari)</label>
-                <input
-                  type="text"
-                  placeholder="128GB"
+                <select
                   value={prodStorage}
                   onChange={e => setProdStorage(e.target.value)}
                   className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
-                />
+                >
+                  <option value="">-- Chagua --</option>
+                  {STORAGE_OPTIONS.map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                  {prodStorage && !STORAGE_OPTIONS.includes(prodStorage) && (
+                    <option value={prodStorage}>{prodStorage}</option>
+                  )}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1">IMEI (Hiari)</label>
@@ -1100,6 +1269,63 @@ export const BossWebDashboard: React.FC = () => {
                   className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white"
                 />
               </div>
+            </div>
+
+            {/* Faida papo hapo chini ya bei */}
+            <div
+              className={`rounded-2xl border p-3 space-y-1.5 ${
+                !prodProfit.ready
+                  ? 'bg-slate-800/50 border-slate-700'
+                  : prodProfit.unit >= 0
+                  ? 'bg-emerald-500/10 border-emerald-500/40'
+                  : 'bg-rose-500/10 border-rose-500/40'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold uppercase tracking-wide text-slate-300 flex items-center gap-1.5">
+                  <TrendingUp className={`w-3.5 h-3.5 ${prodProfit.ready && prodProfit.unit < 0 ? 'text-rose-400' : 'text-emerald-400'}`} />
+                  <span>Faida kwa Bidhaa Moja</span>
+                </span>
+                <span
+                  className={`text-base font-black ${
+                    !prodProfit.ready
+                      ? 'text-slate-400'
+                      : prodProfit.unit >= 0
+                      ? 'text-emerald-400'
+                      : 'text-rose-400'
+                  }`}
+                >
+                  {!prodProfit.ready
+                    ? '—'
+                    : `${prodProfit.unit < 0 ? '-' : ''}${formatCurrency(Math.abs(prodProfit.unit))}`}
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] text-slate-400">
+                <span>
+                  Margin:{' '}
+                  <b className={prodProfit.ready && prodProfit.unit < 0 ? 'text-rose-300' : 'text-emerald-300'}>
+                    {prodProfit.ready ? `${prodProfit.margin.toFixed(1)}%` : '—'}
+                  </b>
+                </span>
+                <span>
+                  Faida ya Stoo ({prodProfit.qty || 0} pcs):{' '}
+                  <b className={prodProfit.ready && prodProfit.total < 0 ? 'text-rose-300' : 'text-emerald-300'}>
+                    {prodProfit.ready
+                      ? `${prodProfit.total < 0 ? '-' : ''}${formatCurrency(Math.abs(prodProfit.total))}`
+                      : '—'}
+                  </b>
+                </span>
+              </div>
+              {!prodProfit.ready && (
+                <p className="text-[11px] text-amber-300">
+                  Jaza bei ya kununua na bei ya kuuza — faida itaonekana hapa papo hapo.
+                </p>
+              )}
+              {prodProfit.ready && prodProfit.unit < 0 && (
+                <p className="text-[11px] text-rose-300 font-bold">
+                  Onyo: unauza kwa hasara (bei ya kuuza iko chini ya mtaji).
+                </p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
