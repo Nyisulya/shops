@@ -237,7 +237,7 @@ const formatSaleItemsText = (sale) => {
     .join(', ');
 };
 
-const notifyFromPushedRecords = async (newSales, updatedSales, newRepairs, newWakala, newLaundry, updatedProducts) => {
+const notifyFromPushedRecords = async (newSales, updatedSales, newRepairs, newWakala, newLaundry, newExpenses, updatedProducts) => {
   if (!fcmEnabled) return;
 
   const bossRows = queryAll("SELECT token FROM device_tokens WHERE role IN ('boss', 'admin')");
@@ -270,6 +270,16 @@ const notifyFromPushedRecords = async (newSales, updatedSales, newRepairs, newWa
         title,
         body,
         { type: 'sale_edit', branchId: s.branchId || '' }
+      );
+    }
+
+    for (const ex of newExpenses) {
+      const shopName = getBranchDisplayName(ex.branchId);
+      await sendPushToTokens(
+        bossTokens,
+        `Matumizi Mapya • ${shopName}`,
+        `${ex.title} • ${formatTzs(ex.amount)}${ex.recordedBy ? ` (${ex.recordedBy})` : ''}`,
+        { type: 'expense', branchId: ex.branchId || '' }
       );
     }
 
@@ -391,6 +401,7 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
     const newRepairs = [];
     const newWakala = [];
     const newLaundry = [];
+    const newExpenses = [];
     const updatedProducts = [];
 
     db.run('BEGIN TRANSACTION');
@@ -436,6 +447,7 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
           else if (rec.table === 'repairs') newRepairs.push(cleanData);
           else if (rec.table === 'wakalaTransactions') newWakala.push(cleanData);
           else if (rec.table === 'laundryOrders') newLaundry.push(cleanData);
+          else if (rec.table === 'expenses') newExpenses.push(cleanData);
         } else if (rec.table === 'sales' && (cleanData.status === 'returned' || cleanData.status === 'edited')) {
           updatedSales.push(cleanData);
         }
@@ -463,7 +475,7 @@ app.post('/api/sync/push', requireApiKey, (req, res) => {
 
     if (savedCount > 0 || deletedCount > 0) {
       broadcastSyncUpdate({ serverTime, savedCount, deletedCount });
-      notifyFromPushedRecords(newSales, updatedSales, newRepairs, newWakala, newLaundry, updatedProducts).catch(() => {});
+      notifyFromPushedRecords(newSales, updatedSales, newRepairs, newWakala, newLaundry, newExpenses, updatedProducts).catch(() => {});
     }
 
     res.json({
@@ -837,7 +849,7 @@ app.post('/api/boss/products', requireApiKey, (req, res) => {
     );
     saveDbToDisk();
     broadcastSyncUpdate({ serverTime: now, savedCount: 1, deletedCount: 0 });
-    notifyFromPushedRecords([], [], [], [], [], [productData]).catch(() => {});
+    notifyFromPushedRecords([], [], [], [], [], [], [productData]).catch(() => {});
 
     res.json({ ok: true, id: prodId, product: productData });
   } catch (err) {
