@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Receipt, Plus, CheckCircle2, Clock } from 'lucide-react';
-import { db } from '../../db/dexie';
+import { Receipt, Plus, CheckCircle2, Clock, Trash2 } from 'lucide-react';
+import { db, queueSync } from '../../db/dexie';
 import { ExpenseCategory } from '../../types';
 import { formatCurrency, formatDate } from '../../services/receiptService';
 import { triggerBackgroundSync } from '../../services/syncService';
@@ -75,6 +75,13 @@ export const PhoneExpenses: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleDelete = async (id: string, titleText: string) => {
+    if (!window.confirm(`Una uhakika unataka kufuta matumizi "${titleText}"?`)) return;
+    await db.expenses.delete(id);
+    await queueSync('expenses', id, 'delete', { id });
+    triggerBackgroundSync();
   };
 
   return (
@@ -179,9 +186,19 @@ export const PhoneExpenses: React.FC = () => {
                 </div>
                 {ex.notes && <div className="text-xs text-slate-500 mt-0.5 truncate">{ex.notes}</div>}
               </div>
-              <div className="text-right shrink-0">
-                <div className="font-black text-sm text-rose-400">-{formatCurrency(ex.amount)}</div>
-                <div className="text-[10px] text-slate-500">{ex.isSynced ? 'Imefika kwa Boss' : 'Inasubiri mtandao'}</div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="text-right">
+                  <div className="font-black text-sm text-rose-400">-{formatCurrency(ex.amount)}</div>
+                  <div className="text-[10px] text-slate-500">{ex.isSynced ? 'Imefika kwa Boss' : 'Inasubiri mtandao'}</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(ex.id, ex.title)}
+                  title="Futa matumizi"
+                  className="p-2 rounded-xl bg-rose-500/15 text-rose-400 hover:bg-rose-500/30"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
             </div>
           ))}

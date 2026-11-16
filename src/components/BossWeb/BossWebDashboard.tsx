@@ -1091,15 +1091,13 @@ export const BossWebDashboard: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="font-black text-sm text-rose-300">-{formatCurrency(e.amount)}</span>
-                      {e.source === 'boss' && (
-                        <button
-                          onClick={() => handleDeleteExpense(e.id)}
-                          title="Futa"
-                          className="p-2 rounded-xl bg-rose-500/15 text-rose-400 hover:bg-rose-500/30"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleDeleteExpense(e.id)}
+                        title="Futa matumizi haya"
+                        className="p-2 rounded-xl bg-rose-500/15 text-rose-400 hover:bg-rose-500/30"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 ))}

@@ -819,8 +819,19 @@ app.post('/api/boss/expenses', requireApiKey, (req, res) => {
 
 app.delete('/api/boss/expenses/:id', requireApiKey, (req, res) => {
   try {
-    db.run('DELETE FROM boss_expenses WHERE id = ?', [req.params.id]);
+    const id = String(req.params.id);
+    const now = new Date().toISOString();
+    db.run('DELETE FROM boss_expenses WHERE id = ?', [id]);
+    db.run(
+      `INSERT INTO sync_records (table_name, id, branch_id, data, updated_at, deleted)
+       VALUES ('expenses', ?, NULL, '{}', ?, 1)
+       ON CONFLICT(table_name, id) DO UPDATE SET
+         updated_at = excluded.updated_at,
+         deleted = 1`,
+      [id, now]
+    );
     saveDbToDisk();
+    broadcastSyncUpdate({ serverTime: now, savedCount: 0, deletedCount: 1 });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ ok: false, error: err?.message || 'Server error' });
