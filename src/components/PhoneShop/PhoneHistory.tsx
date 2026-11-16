@@ -122,6 +122,7 @@ export const PhoneHistory: React.FC<PhoneHistoryProps> = ({ onOpenReceipt }) => 
         const newFinal = Math.max(0, newTotal - discountVal);
         const isFullReturn = targetItems.length === 0;
 
+        const currentStaff = localStorage.getItem('staff_display_name') || editingSale.cashierName || 'Muuzaji';
         const updatedSale: Sale = {
           ...editingSale,
           items: isFullReturn ? editingSale.items.map(it => ({ ...it, quantity: 0, totalPrice: 0 })) : targetItems,
@@ -130,6 +131,7 @@ export const PhoneHistory: React.FC<PhoneHistoryProps> = ({ onOpenReceipt }) => 
           finalAmount: newFinal,
           status: isFullReturn ? 'returned' : 'edited',
           editedAt: now,
+          editedBy: currentStaff,
           returnNote: returnNote.trim() || (isFullReturn ? 'Mteja amerudisha mzigo wote' : 'Imerekebishwa na muuzaji'),
           isSynced: false
         };
@@ -236,6 +238,12 @@ export const PhoneHistory: React.FC<PhoneHistoryProps> = ({ onOpenReceipt }) => 
                     Mteja: {sale.customerName} {sale.customerPhone ? `(${sale.customerPhone})` : ''}
                   </div>
                 )}
+                <div className="text-[11px] text-slate-400 mt-0.5">
+                  Aliyeuza: <span className="text-slate-200 font-semibold">{sale.cashierName || 'Muuzaji'}</span>
+                  {sale.editedBy ? (
+                    <> • Aliyebadilisha: <span className="text-amber-300 font-semibold">{sale.editedBy}</span></>
+                  ) : null}
+                </div>
                 {sale.returnNote && (
                   <div className="text-[11px] text-amber-300/90 mt-0.5">Sababu: {sale.returnNote}</div>
                 )}

@@ -41,9 +41,7 @@ import { DataManagement } from './components/BossDashboard/DataManagement';
 import { BossWebDashboard } from './components/BossWeb/BossWebDashboard';
 
 const MainPosApp: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    return localStorage.getItem('is_authenticated') === 'true';
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [currentBranchType, setCurrentBranchType] = useState<BranchType>(() => {
     return (localStorage.getItem('active_auth_branch') as BranchType) || 'phone';
   });
@@ -60,6 +58,34 @@ const MainPosApp: React.FC = () => {
   // Double-tap back button to exit app states
   const [showExitToast, setShowExitToast] = useState(false);
   const lastBackPressRef = useRef<number>(0);
+
+  // Lock app automatically whenever minimized, backgrounded, or phone screen locks
+  useEffect(() => {
+    localStorage.removeItem('is_authenticated');
+    let stateListener: any = null;
+    const setupAppStateLock = async () => {
+      try {
+        stateListener = await CapApp.addListener('appStateChange', ({ isActive }) => {
+          if (!isActive) {
+            setIsAuthenticated(false);
+          }
+        });
+      } catch {}
+    };
+    setupAppStateLock();
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        setIsAuthenticated(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      if (stateListener) stateListener.remove();
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   // Initialize DB data once and re-check license periodically
   useEffect(() => {
@@ -147,7 +173,6 @@ const MainPosApp: React.FC = () => {
     setIsAuthenticated(true);
     setCurrentBranchType(branchType);
     if (branchId) setCurrentBranchId(branchId);
-    localStorage.setItem('is_authenticated', 'true');
     localStorage.setItem('active_auth_branch', branchType);
     if (branchId) localStorage.setItem('active_branch_id', branchId);
 

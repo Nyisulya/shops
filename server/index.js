@@ -264,10 +264,11 @@ const notifyFromPushedRecords = async (newSales, updatedSales, newRepairs, newWa
     for (const s of newSales) {
       const shopName = getBranchDisplayName(s.branchId);
       const itemsText = formatSaleItemsText(s);
+      const seller = s.cashierName ? ` • Muuzaji: ${s.cashierName}` : '';
       await sendPushToTokens(
         bossTokens,
         `Mauzo Mapya • ${shopName}`,
-        `${itemsText} • ${formatTzs(s.finalAmount)}`,
+        `${itemsText} • ${formatTzs(s.finalAmount)}${seller}`,
         { type: 'sale', branchId: s.branchId || '' }
       );
     }
@@ -276,12 +277,14 @@ const notifyFromPushedRecords = async (newSales, updatedSales, newRepairs, newWa
       if (s.status !== 'returned' && s.status !== 'edited') continue;
       const shopName = getBranchDisplayName(s.branchId);
       const itemsText = formatSaleItemsText(s);
+      const actor = s.editedBy || s.cashierName;
+      const actorText = actor ? ` • Aliyebadilisha: ${actor}` : '';
       const title = s.status === 'returned'
         ? `Mzigo Umerudishwa • ${shopName}`
         : `Mauzo Yamehaririwa • ${shopName}`;
       const body = s.status === 'returned'
-        ? `${itemsText} imerudishwa${s.returnNote ? ` • ${s.returnNote}` : ''}`
-        : `${itemsText} • ${formatTzs(s.finalAmount)}${s.returnNote ? ` (${s.returnNote})` : ''}`;
+        ? `${itemsText} imerudishwa${s.returnNote ? ` • ${s.returnNote}` : ''}${actorText}`
+        : `${itemsText} • ${formatTzs(s.finalAmount)}${s.returnNote ? ` (${s.returnNote})` : ''}${actorText}`;
       await sendPushToTokens(
         bossTokens,
         title,

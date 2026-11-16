@@ -198,6 +198,7 @@ export const PinLogin: React.FC<PinLoginProps> = ({
   onLoginSuccess
 }) => {
   const [pin, setPin] = useState<string>('');
+  const [staffName, setStaffName] = useState<string>(() => localStorage.getItem('staff_display_name') || '');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successShop, setSuccessShop] = useState<ShopOption | null>(null);
   const [isShaking, setIsShaking] = useState<boolean>(false);
@@ -206,6 +207,9 @@ export const PinLogin: React.FC<PinLoginProps> = ({
   // Keyboard input listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        return;
+      }
       if (e.key >= '0' && e.key <= '9') {
         handleDigit(e.key);
       } else if (e.key === 'Backspace') {
@@ -245,6 +249,23 @@ export const PinLogin: React.FC<PinLoginProps> = ({
     const matchedShop = findShopByPin(inputPin);
 
     if (matchedShop) {
+      const cleanName = staffName.trim();
+      if (matchedShop.type !== 'boss' && matchedShop.type !== 'admin' && cleanName.length < 2) {
+        setIsShaking(true);
+        setErrorMsg('Andika jina lako kwanza juu kabla ya kuweka PIN!');
+        setTimeout(() => {
+          setIsShaking(false);
+          setPin('');
+        }, 600);
+        return;
+      }
+
+      if (cleanName.length >= 2) {
+        localStorage.setItem('staff_display_name', cleanName);
+      } else if (matchedShop.type === 'boss' || matchedShop.type === 'admin') {
+        localStorage.setItem('staff_display_name', 'Boss');
+      }
+
       setSuccessShop(matchedShop);
       setErrorMsg(null);
       localStorage.setItem('active_auth_branch', matchedShop.type);
@@ -293,6 +314,25 @@ export const PinLogin: React.FC<PinLoginProps> = ({
         {/* PIN Entry Card */}
         <div className="p-5 bg-slate-900/90 border border-slate-800 rounded-3xl shadow-2xl backdrop-blur-md space-y-4">
           
+          {/* Staff Name (Saved automatically after first entry) */}
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wide">
+              Jina Lako (Muuzaji):
+            </label>
+            <input
+              type="text"
+              value={staffName}
+              onChange={e => {
+                setStaffName(e.target.value);
+                if (e.target.value.trim().length >= 2) {
+                  localStorage.setItem('staff_display_name', e.target.value.trim());
+                }
+              }}
+              placeholder="Andika jina lako (mfano: Asha Juma)"
+              className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-2xl text-sm font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
           {/* Status or Shop Identified */}
           <div className="text-center space-y-2 min-h-[50px] flex flex-col items-center justify-center">
             {successShop ? (

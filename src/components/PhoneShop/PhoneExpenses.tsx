@@ -25,7 +25,7 @@ export const PhoneExpenses: React.FC = () => {
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<ExpenseCategory>('umeme_luku');
   const [amount, setAmount] = useState('');
-  const [recordedBy, setRecordedBy] = useState('');
+  const [recordedBy, setRecordedBy] = useState(() => localStorage.getItem('staff_display_name') || '');
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [savedToast, setSavedToast] = useState(false);

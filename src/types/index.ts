@@ -64,6 +64,7 @@ export interface Sale {
   notes?: string;
   status?: 'completed' | 'edited' | 'returned';
   editedAt?: string;
+  editedBy?: string;
   returnNote?: string;
   createdAt: string;
   isSynced: boolean;
@@ -247,6 +248,7 @@ export interface Expense {
   notes?: string;
   status?: 'completed' | 'edited' | 'returned';
   editedAt?: string;
+  editedBy?: string;
   returnNote?: string;
   createdAt: string;
   isSynced: boolean;

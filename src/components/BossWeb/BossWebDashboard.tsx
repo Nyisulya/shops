@@ -60,7 +60,7 @@ const categoryLabel = (cat?: string) => {
 
 export const BossWebDashboard: React.FC = () => {
   const { apiUrl } = getSyncConfig();
-  const [apiKey, setApiKey] = useState<string>(() => sessionStorage.getItem('boss_web_api_key') || '');
+  const [apiKey, setApiKey] = useState<string>('');
   const [pin, setPin] = useState('');
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -320,11 +320,13 @@ export const BossWebDashboard: React.FC = () => {
   const exportSalesCsv = () => {
     if (!data?.sales?.length) return;
     const rows = [
-      ['Tarehe', 'Tawi', 'Bidhaa Zilizouzwa', 'Njia ya Malipo', 'Mteja', 'Kiasi (TZS)'],
+      ['Tarehe', 'Tawi', 'Bidhaa Zilizouzwa', 'Muuzaji', 'Aliyebadilisha', 'Njia ya Malipo', 'Mteja', 'Kiasi (TZS)'],
       ...data.sales.map((s: any) => [
         formatDate(s.createdAt),
         branchLabel(s.branchId),
         (s.items || []).map((i: any) => `${i.productName} (${i.quantity})`).join(' | '),
+        s.cashierName || '-',
+        s.editedBy || '-',
         s.paymentMethod,
         s.customerName || '-',
         s.finalAmount
@@ -739,6 +741,8 @@ export const BossWebDashboard: React.FC = () => {
                         </div>
                         <div className="text-xs text-slate-400">
                           {branchLabel(s.branchId)} • {formatDate(s.createdAt)} • {String(s.paymentMethod || '').toUpperCase()}
+                          {s.cashierName ? ` • Muuzaji: ${s.cashierName}` : ''}
+                          {s.editedBy ? ` • Aliyebadilisha: ${s.editedBy}` : ''}
                           {s.returnNote ? ` • ${s.returnNote}` : ''}
                         </div>
                       </div>
@@ -1127,6 +1131,7 @@ export const BossWebDashboard: React.FC = () => {
                     <th className="py-2.5 pr-3">Tarehe</th>
                     <th className="py-2.5 pr-3">Tawi</th>
                     <th className="py-2.5 pr-3">Bidhaa Zilizouzwa</th>
+                    <th className="py-2.5 pr-3">Muuzaji / Aliyebadilisha</th>
                     <th className="py-2.5 pr-3">Malipo</th>
                     <th className="py-2.5 text-right">Jumla</th>
                   </tr>
@@ -1151,6 +1156,10 @@ export const BossWebDashboard: React.FC = () => {
                           )}
                         </div>
                         {s.returnNote && <div className="text-[11px] font-normal text-slate-400 mt-0.5">{s.returnNote}</div>}
+                      </td>
+                      <td className="py-2.5 pr-3 text-xs">
+                        <div className="font-semibold text-slate-200">{s.cashierName || '-'}</div>
+                        {s.editedBy && <div className="text-[11px] text-amber-300">Aliyebadilisha: {s.editedBy}</div>}
                       </td>
                       <td className="py-2.5 pr-3 uppercase text-xs text-slate-300">{s.paymentMethod}</td>
                       <td className="py-2.5 text-right font-black text-blue-400">{formatCurrency(s.finalAmount)}</td>

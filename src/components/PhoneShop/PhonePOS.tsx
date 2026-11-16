@@ -143,7 +143,7 @@ export const PhonePOS: React.FC<PhonePOSProps> = ({ onSaleComplete }) => {
         paymentMethod,
         customerName: customerName.trim() || undefined,
         customerPhone: customerPhone.trim() || undefined,
-        cashierName: 'Muuzaji',
+        cashierName: localStorage.getItem('staff_display_name') || 'Muuzaji',
         createdAt: new Date().toISOString(),
         isSynced: false
       };
